@@ -1,0 +1,30 @@
+{
+  "user_name": "Golan",
+  "rules": [
+    {
+      "topic": "Job Rejections",
+      "keywords": ["unfortunately", "not moving forward", "other candidates", "תשובה שלילית", "מצטערים להודיע", "מועמדים אחרים"],
+      "action": "trash",
+      "risk": "safe"
+    },
+    {
+      "topic": "Job Interview / Progress",
+      "keywords": ["interview", "schedule a call", "next steps", "moving forward", "זומנת לראיון", "התקדמות בתהליך", "שלב הבא"],
+      "action": "notify_user",
+      "risk": "safe",
+      "note": "This is critical! Use 'notify_user' with a happy summary."
+    },
+    {
+      "topic": "Spam & Newsletters",
+      "keywords": ["unsubscribe", "sale", "off", "newsletter", "פרסומת", "הסר", "מבצע"],
+      "action": "trash",
+      "risk": "safe"
+    },
+    {
+      "topic": "Official Job Offer",
+      "keywords": ["offering you", "contract", "salary", "job offer", "congratulations", "שמחים להודיע", "הצעת עבודה", "חוזה"],
+      "action": "draft_email",
+      "risk": "moderate"
+    }
+  ]
+}

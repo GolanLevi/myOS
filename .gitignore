@@ -1,0 +1,29 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Environment Variables & Secrets
+.env
+payload.json
+credentials.json
+token.json
+client_secret.json
+
+# IDEs
+.vscode/
+.idea/
+
+# Docker
+docker-compose.override.yml
+
+# Project specific
+waha_sessions/
+logs/
+chroma_data/
+mongo_data/
+n8n_data/
