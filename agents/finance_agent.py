@@ -11,7 +11,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 class FinanceAgent:
     def __init__(self):
         self.name = "finance_agent"
-        self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        self.model = genai.GenerativeModel('gemini-flash-latest')
         
     def process(self, user_input: str) -> ActionProposal:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M")

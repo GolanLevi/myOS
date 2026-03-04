@@ -8,7 +8,6 @@ from datetime import datetime
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = 8000
 
-
 # ⚠️ הדבק כאן את המפתח שלך (בתוך המרכאות):
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
@@ -18,15 +17,15 @@ class InformationAgent:
         try:
             self.client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
             self.collection = self.client.get_or_create_collection("my_knowledge")
-            
+           
             # חיבור למוח של ג'ימני
             if not GOOGLE_API_KEY:
                 print("⚠️ WARNING: No Google API Key provided! The 'brain' won't work.")
             else:
                 genai.configure(api_key=GOOGLE_API_KEY)
-                self.model = genai.GenerativeModel('gemini-1.5-pro-latest') # מודל מהיר וחכם
-                print("✅ Connected to Knowledge Base & Gemini Brain!")
-                
+            self.model = genai.GenerativeModel('gemini-flash-latest')
+            print("✅ InformationAgent connected to Gemini (Model: gemini-flash-latest)")
+               
         except Exception as e:
             print(f"❌ Connection Error: {e}")
 
@@ -35,7 +34,7 @@ class InformationAgent:
             # מניעת כפילויות גסה
             existing = self.collection.get(where_document={"$contains": text[:50]})
             if existing and len(existing['ids']) > 0:
-                return False 
+                return False
 
             doc_id = str(uuid.uuid4())
             timestamp = datetime.now().isoformat()
@@ -73,26 +72,26 @@ class InformationAgent:
         """ 🧠 RAG: שליפת מידע + ניתוח של AI """
         try:
             print("   🔍 Brain is reading relevant emails...")
-            
+           
             # 1. שליפת המיילים הרלוונטיים ביותר לשאלה
             relevant_docs = self.recall(user_question, n_results=20)
-            
+           
             if not relevant_docs:
                 return "לא מצאתי מיילים שקשורים לנושא הזה בזיכרון שלי."
 
             # 2. בניית ה-Prompt (ההוראות ל-AI)
             context_text = "\n\n".join(relevant_docs)
-            
+           
             prompt = f"""
-            You are a helpful personal assistant. 
+            You are a helpful personal assistant.
             Analyze the following email snippets from the user's inbox and answer the user's question.
-            
+           
             User Question: "{user_question}"
-            
+           
             --- EMAILS CONTEXT ---
             {context_text}
             ----------------------
-            
+           
             Instructions:
             1. Extract specific details (Company names, Roles, Status).
             2. If the user asks for rejections vs. receipts, categorize them clearly.
