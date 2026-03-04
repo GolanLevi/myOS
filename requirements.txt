@@ -9,3 +9,7 @@ python-dotenv
 requests
 pydantic
 google-generativeai
+beautifulsoup4
+python-dateutil
+pdfplumber
+python-docx

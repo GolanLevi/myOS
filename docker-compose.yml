@@ -46,22 +46,6 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
-  waha:
-    image: devlikeapro/waha
-    container_name: myos_waha
-    restart: always
-    environment:
-      - WHATSAPP_DEFAULT_ENGINE=WEBJS
-      - WHATSAPP_RESTART_ON_FAIL=True
-      - WHATSAPP_DISABLE_WEB_PAGE_PREVIEW=True
-      - WAHA_DASHBOARD_USERNAME=admin
-      - WAHA_DASHBOARD_PASSWORD=a89ab8c73de84322832c5fa6c9602177
-      - WAHA_API_KEY=secret
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./waha_sessions:/app/sessions
-
   ngrok:
     image: ngrok/ngrok:latest
     container_name: myos_tunnel
