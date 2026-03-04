@@ -27,3 +27,11 @@ logs/
 chroma_data/
 mongo_data/
 n8n_data/
+
+# AI workspace temp files
+implementation_plan.md
+task.md
+walkthrough.md
+
+# Test assets
+test_image.jpg
