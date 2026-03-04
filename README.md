@@ -31,14 +31,40 @@
 
 ---
 
-## 🎬 Demo
+## 🎬 Demo — Email Analysis in Action
 
-<!-- Add your screenshots or GIFs here -->
-<!-- Example: -->
-<!-- ![WhatsApp Approval Flow](docs/demo_whatsapp.gif) -->
-<!-- ![Email Analysis](docs/demo_email_analysis.png) -->
+**Request** — Analyze an incoming interview invitation:
 
-> 📸 *Screenshots and demo GIFs coming soon.*
+```bash
+curl -X POST http://localhost:8080/analyze_email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Subject: Interview Invitation\nDear candidate, we would like to invite you for an interview on Sunday at 14:00.",
+    "source": "gmail",
+    "email_id": "msg_demo_001"
+  }'
+```
+
+**Response** — The system classifies, drafts a reply, and asks for approval:
+
+```json
+{
+  "status": "success",
+  "classification": "MEETING",
+  "action_needed": true,
+  "summary": "🎯 Interview invitation! Sunday at 14:00",
+  "proposed_action": "schedule_event",
+  "draft_reply": "Hi, thank you for the invitation. I confirm my attendance on Sunday at 14:00.",
+  "approval_message": "📅 Schedule a calendar event and send confirmation?"
+}
+```
+
+**What happens behind the scenes:**
+1. n8n detects new email and pushes to the server
+2. Secretariat Agent classifies → "Meeting Request"
+3. Checks calendar availability → Sunday 14:00 is free
+4. Drafts a reply + proposes a calendar event
+5. Sends you a WhatsApp message: "📅 Schedule event?" → You reply "Yes" → Done ✅
 
 ---
 
@@ -46,40 +72,39 @@
 
 The system follows an **Event-Driven Centralized Orchestration** pattern with **Human-in-the-Loop** approval. n8n acts as an **Ingress Controller**, capturing webhooks and incoming events (new emails, WhatsApp messages) and pushing them into the FastAPI server. The server processes, routes to specialized agents, and responds back through n8n for execution.
 
-```
-                    ┌──────────────────────────────────┐
-                    │          External World           │
-                    │  Gmail · WhatsApp · Telegram · PDF│
-                    └───────────────┬──────────────────┘
-                                    │
-                          ┌─────────▼─────────┐
-                   ┌──────│   n8n Gateway      │──────┐
-                   │      │  (Ingress Controller)│      │
-                   │      └─────────┬─────────┘      │
-                   │  webhooks /    │   executes      │
-                   │  triggers     │   actions       │
-                   │      ┌────────▼────────┐        │
-                   │      │   FastAPI        │        │
-                   └─────►│   Server         │◄───────┘
-                          │  (Orchestrator)  │
-                          └──┬────┬────┬─────┘
-                             │    │    │
-              ┌──────────────┘    │    └──────────────┐
-              ▼                   ▼                    ▼
-       ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
-       │ Secretariat  │  │ Information  │  │   Finance    │
-       │   Agent      │  │    Agent     │  │    Agent     │
-       │ (emails,     │  │  (RAG,       │  │ (invoices,   │
-       │  calendar)   │  │   memory)    │  │  payments)   │
-       └──────┬──────┘  └──────┬───────┘  └──────────────┘
-              │                │
-              │         ┌──────▼───────┐
-              │         │   ChromaDB   │ (Vector Memory)
-              │         └──────────────┘
-              │
-         ┌────▼─────┐
-         │ MongoDB  │ (State, Logs & Approvals)
-         └──────────┘
+```mermaid
+graph TD
+    classDef external fill:#f2f2f2,stroke:#666,stroke-width:2px,color:#000
+    classDef n8n fill:#ff6633,stroke:#333,stroke-width:2px,color:#000
+    classDef core fill:#66b3ff,stroke:#333,stroke-width:2px,color:#000
+    classDef agent fill:#00cc99,stroke:#333,stroke-width:2px,color:#000
+    classDef storage fill:#ffcc00,stroke:#333,stroke-width:2px,color:#000
+    classDef user fill:#ff99cc,stroke:#333,stroke-width:3px,color:#000
+
+    Sources["Gmail / WhatsApp / Telegram / PDF"]:::external
+    N8N["n8n Gateway (Ingress Controller)"]:::n8n
+    Server["FastAPI Server (Orchestrator)"]:::core
+    SecAgent["Secretariat Agent<br/>emails, calendar, drafts"]:::agent
+    InfoAgent["Information Agent<br/>RAG, memory, Q&A"]:::agent
+    FinAgent["Finance Agent<br/>invoices, payments"]:::agent
+    DB[("MongoDB<br/>State & Logs")]:::storage
+    RAG[("ChromaDB<br/>Vector Memory")]:::storage
+    User(("User")):::user
+
+    Sources -->|"webhooks"| N8N
+    N8N -->|"normalized events"| Server
+    Server -->|"route"| SecAgent
+    Server -->|"route"| InfoAgent
+    Server -->|"route"| FinAgent
+    InfoAgent -.->|"store / retrieve"| RAG
+    SecAgent -.->|"context"| RAG
+    SecAgent -->|"proposal"| Server
+    InfoAgent -->|"answer"| Server
+    FinAgent -->|"proposal"| Server
+    Server -->|"log"| DB
+    Server <-->|"approval"| User
+    Server -->|"execute"| N8N
+    N8N -->|"API actions"| Sources
 ```
 
 ### Data Flow

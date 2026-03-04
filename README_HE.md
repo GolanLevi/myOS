@@ -31,69 +31,124 @@
 
 > **🔒 עקרון מפתח: Human-in-the-Loop** — שום פעולה רגישה לא מתבצעת ללא אישור מפורש שלך.
 
----
-
-## 🎬 הדגמה
-
-<!-- הוסף כאן צילומי מסך או GIFs -->
-<!-- דוגמה: -->
-<!-- ![תהליך אישור בוואטסאפ](docs/demo_whatsapp.gif) -->
-<!-- ![ניתוח מייל](docs/demo_email_analysis.png) -->
-
-> 📸 *צילומי מסך והדגמות יתווספו בקרוב.*
+</div>
 
 ---
+
+<div dir="rtl">
+
+## 🎬 הדגמה — תהליך ניתוח מייל
+
+דוגמה לבקשת ניתוח מייל נכנס:
+
+</div>
+
+```bash
+# שליחת מייל לניתוח
+curl -X POST http://localhost:8080/analyze_email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Subject: Interview Invitation\nDear candidate, we would like to invite you for an interview on Sunday at 14:00.",
+    "source": "gmail",
+    "email_id": "msg_demo_001"
+  }'
+```
+
+```json
+// תגובת המערכת
+{
+  "status": "success",
+  "classification": "MEETING",
+  "action_needed": true,
+  "summary": "🎯 זומנת לראיון! יום ראשון ב-14:00",
+  "proposed_action": "schedule_event",
+  "draft_reply": "Hi, thank you for the invitation. I confirm my attendance on Sunday at 14:00.",
+  "approval_message": "📅 רוצה שאקבע ביומן ואשלח אישור?"
+}
+```
+
+<div dir="rtl">
+
+**מה קורה מאחורי הקלעים:**
+1. n8n מזהה מייל חדש ודוחף לשרת
+2. סוכן המזכירות מסווג → "בקשה לפגישה"
+3. בודק זמינות ביומן → יום ראשון 14:00 פנוי
+4. מכין טיוטת תגובה + הצעה לאירוע ביומן
+5. שולח לך הודעה בוואטסאפ: "📅 רוצה שאקבע ביומן?" → אתה עונה "כן" → בוצע ✅
+
+</div>
+
+---
+
+<div dir="rtl">
 
 ## 🏗️ ארכיטקטורה
 
 המערכת בנויה בארכיטקטורת **Event-Driven Centralized Orchestration** עם **Human-in-the-Loop**. n8n משמש כ-**Ingress Controller** — הוא קולט webhooks ואירועים נכנסים (מייל חדש, הודעת וואטסאפ) ודוחף אותם לשרת ה-FastAPI. השרת מעבד, מנתב לסוכנים המתמחים ומגיב חזרה דרך n8n לביצוע.
 
+</div>
+
+```mermaid
+graph TD
+    classDef external fill:#f2f2f2,stroke:#666,stroke-width:2px,color:#000
+    classDef n8n fill:#ff6633,stroke:#333,stroke-width:2px,color:#000
+    classDef core fill:#66b3ff,stroke:#333,stroke-width:2px,color:#000
+    classDef agent fill:#00cc99,stroke:#333,stroke-width:2px,color:#000
+    classDef storage fill:#ffcc00,stroke:#333,stroke-width:2px,color:#000
+    classDef user fill:#ff99cc,stroke:#333,stroke-width:3px,color:#000
+
+    Sources["Gmail / WhatsApp / Telegram / PDF"]:::external
+
+    N8N["n8n Gateway (Ingress Controller)"]:::n8n
+
+    Server["FastAPI Server (Orchestrator)"]:::core
+
+    SecAgent["Secretariat Agent<br/>emails, calendar, drafts"]:::agent
+    InfoAgent["Information Agent<br/>RAG, memory, Q&A"]:::agent
+    FinAgent["Finance Agent<br/>invoices, payments"]:::agent
+
+    DB[("MongoDB<br/>State & Logs")]:::storage
+    RAG[("ChromaDB<br/>Vector Memory")]:::storage
+
+    User(("User")):::user
+
+    Sources -->|"webhooks"| N8N
+    N8N -->|"normalized events"| Server
+    Server -->|"route"| SecAgent
+    Server -->|"route"| InfoAgent
+    Server -->|"route"| FinAgent
+
+    InfoAgent -.->|"store / retrieve"| RAG
+    SecAgent -.->|"context"| RAG
+
+    SecAgent -->|"proposal"| Server
+    InfoAgent -->|"answer"| Server
+    FinAgent -->|"proposal"| Server
+
+    Server -->|"log"| DB
+    Server <-->|"approval"| User
+    Server -->|"execute"| N8N
+    N8N -->|"API actions"| Sources
 ```
-                    ┌──────────────────────────────────┐
-                    │          העולם החיצוני            │
-                    │  Gmail · WhatsApp · Telegram · PDF│
-                    └───────────────┬──────────────────┘
-                                    │
-                          ┌─────────▼─────────┐
-                   ┌──────│    n8n Gateway     │──────┐
-                   │      │ (Ingress Controller)│      │
-                   │      └─────────┬─────────┘      │
-                   │  webhooks /    │   ביצוע        │
-                   │  טריגרים     │   פעולות       │
-                   │      ┌────────▼────────┐        │
-                   │      │   FastAPI        │        │
-                   └─────►│   Server         │◄───────┘
-                          │  (Orchestrator)  │
-                          └──┬────┬────┬─────┘
-                             │    │    │
-              ┌──────────────┘    │    └──────────────┐
-              ▼                   ▼                    ▼
-       ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
-       │   סוכן      │  │   סוכן       │  │   סוכן       │
-       │  המזכירות   │  │   המידע      │  │  הכספים      │
-       │ (מיילים,    │  │  (RAG,       │  │ (חשבוניות,   │
-       │  יומן)      │  │  זיכרון)     │  │  תשלומים)    │
-       └──────┬──────┘  └──────┬───────┘  └──────────────┘
-              │                │
-              │         ┌──────▼───────┐
-              │         │   ChromaDB   │ (זיכרון וקטורי)
-              │         └──────────────┘
-              │
-         ┌────▼─────┐
-         │ MongoDB  │ (מצב, לוגים ואישורים)
-         └──────────┘
-```
+
+<div dir="rtl">
 
 ### זרימת המידע
 
-1. **קליטה** — n8n קולט webhooks משירותים חיצוניים ודוחף אירועים מנורמלים לשרת FastAPI דרך HTTP POST
+1. **קליטה** — n8n קולט webhooks משירותים חיצוניים ודוחף אירועים מנורמלים לשרת FastAPI
 2. **ניתוב** — השרת מנתב את הבקשה לסוכן המתמחה המתאים לניתוח
 3. **עיבוד** — הסוכן מנתח את הקלט ומחזיר הצעה (טיוטת תגובה, אירוע ביומן, סיווג)
-4. **התראה** — השרת שולח סיכום קריא בחזרה דרך n8n לוואטסאפ/טלגרם, ומבקש אישור המשתמש
+4. **התראה** — השרת שולח סיכום קריא בחזרה דרך n8n לוואטסאפ/טלגרם, ומבקש אישור
 5. **אישור** — המשתמש מאשר או דוחה; n8n מעביר את ההחלטה חזרה לשרת
-6. **ביצוע** — לאחר אישור, השרת מורה ל-n8n לבצע את הפעולה (שליחת מייל, יצירת אירוע וכו')
+6. **ביצוע** — לאחר אישור, השרת מורה ל-n8n לבצע את הפעולה
+
+</div>
+
+<div dir="rtl">
 
 ### הסוכנים
+
+</div>
 
 | סוכן | תפקיד | סטטוס |
 |------|--------|-------|
@@ -103,32 +158,40 @@
 
 ---
 
+<div dir="rtl">
+
 ## 🔐 אבטחה ופרטיות
 
-myOS תוכננה עם פרטיות כערך עליון:
-
-- **100% Self-Hosted** — כל המערכת רצה מקומית על המחשב שלך (או בסביבת Docker משלך). שום מידע לא נשלח לשרתים חיצוניים מעבר לקריאות API של מודל ה-AI.
+- **100% Self-Hosted** — כל המערכת רצה מקומית על המחשב שלך. שום מידע לא נשלח לשרתים חיצוניים מעבר לקריאות API של מודל ה-AI.
 - **ניהול סודות** — כל המפתחות והטוקנים נשמרים ב-`.env` ו-`token.json`, שניהם מוחרגים מ-Git דרך `.gitignore`.
-- **OAuth 2.0** — גישה ל-Google APIs דרך פרוטוקול OAuth 2.0 עם הרשאות ממוקדות — רק הגישה המינימלית הנדרשת.
-- **Human-in-the-Loop** — כל פעולה רגישה (שליחת מייל, קביעת פגישה, תשלום) דורשת אישור מפורש שלך לפני ביצוע.
+- **OAuth 2.0** — גישה ל-Google APIs דרך פרוטוקול OAuth 2.0 עם הרשאות ממוקדות בלבד.
+- **Human-in-the-Loop** — כל פעולה רגישה דורשת אישור מפורש שלך לפני ביצוע.
 - **פרטיות בטיוטות** — טיוטות הקשורות ליומן משתמשות במונחים גנריים ("תפוס") במקום לחשוף פרטי אירועים.
+
+</div>
 
 ---
 
+<div dir="rtl">
+
 ## 🛠️ טכנולוגיות
+
+</div>
 
 | טכנולוגיה | תפקיד | למה? |
 |-----------|--------|------|
 | **Python 3.11** | שפת ליבה | תחביר נקי, אקוסיסטם AI/ML עשיר, תמיכה מובנית ב-async |
-| **FastAPI** | פריימוורק ווב | ביצועים גבוהים עם async מובנה, דוקומנטציה אוטומטית (OpenAPI), type safety דרך Pydantic |
-| **Google Gemini** | מודל AI | יכולות מולטימודליות (טקסט + ראייה), תמיכה מעולה בעברית, מכסות API נדיבות |
+| **FastAPI** | פריימוורק ווב | ביצועים גבוהים עם async מובנה, דוקומנטציה אוטומטית, type safety |
+| **Google Gemini** | מודל AI | יכולות מולטימודליות, תמיכה מעולה בעברית, מכסות API נדיבות |
 | **ChromaDB** | מסד וקטורי | קל משקל ומשובץ — מושלם ל-RAG מקומי ללא תשתית חיצונית |
-| **MongoDB** | מסד מסמכים | גמישות Schema-less למבני נתונים מגוונים (חשבוניות מול הודעות מול אירועים) |
-| **n8n** | מנוע אוטומציה | בונה תהליכים ויזואלי לחיבור Gmail, WhatsApp, Telegram — בלי קוד אינטגרציה |
-| **Docker Compose** | קונטיינריזציה | פקודה אחת להקמת כל 5 השירותים בסביבות עקביות |
-| **ngrok** | מנהרות | חשיפת השרת המקומי ל-webhooks חיצוניים מ-WhatsApp וטלגרם |
+| **MongoDB** | מסד מסמכים | גמישות Schema-less למבני נתונים מגוונים |
+| **n8n** | מנוע אוטומציה | בונה תהליכים ויזואלי לחיבור Gmail, WhatsApp, Telegram |
+| **Docker Compose** | קונטיינריזציה | פקודה אחת להקמת כל 5 השירותים |
+| **ngrok** | מנהרות | חשיפת השרת המקומי ל-webhooks חיצוניים |
 
 ---
+
+<div dir="rtl">
 
 ## 🚀 התקנה מהירה
 
@@ -141,19 +204,27 @@ myOS תוכננה עם פרטיות כערך עליון:
 
 ### 1. שכפול הפרויקט
 
+</div>
+
 ```bash
 git clone https://github.com/GolanLevi/myOS.git
 cd myOS
 ```
 
+<div dir="rtl">
+
 ### 2. הגדרת משתני סביבה
 
 צור קובץ `.env` בתיקיית השורש:
+
+</div>
 
 ```env
 GOOGLE_API_KEY=your_gemini_api_key_here
 NGROK_AUTHTOKEN=your_ngrok_token_here
 ```
+
+<div dir="rtl">
 
 ### 3. הגדרת Google OAuth
 
@@ -162,19 +233,23 @@ NGROK_AUTHTOKEN=your_ngrok_token_here
 3. צור OAuth 2.0 Credentials והורד את `credentials.json` לתיקיית השורש
 4. הרץ את סקריפט האימות:
 
+</div>
+
 ```bash
 python auth_setup.py
 ```
+
+<div dir="rtl">
 
 > זה ייצור קובץ `token.json` לגישה אוטומטית ל-Gmail ו-Calendar.
 
 ### 4. הרצה עם Docker Compose
 
+</div>
+
 ```bash
 docker-compose up --build
 ```
-
-זה יעלה את כל השירותים:
 
 | שירות | פורט | תיאור |
 |-------|------|--------|
@@ -184,44 +259,48 @@ docker-compose up --build
 | **n8n** | `5678` | מנוע אוטומציה |
 | **ngrok** | `4040` | דשבורד מנהרה |
 
+<div dir="rtl">
+
 ### 5. הרצה מקומית (ללא Docker)
+
+</div>
 
 ```bash
 pip install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+<div dir="rtl">
+
 > ⚠️ בהרצה מקומית יש לוודא ש-MongoDB ו-ChromaDB רצים בנפרד.
+
+</div>
 
 ---
 
+<div dir="rtl">
+
 ## 📡 נקודות קצה (API)
+
+</div>
 
 | Endpoint | Method | תיאור |
 |----------|--------|--------|
 | `/` | GET | בדיקת חיבור — "myOS is alive!" |
 | `/analyze_email` | POST | ניתוח מייל נכנס (סיווג, טיוטה, פגישה) |
 | `/ask` | POST | שיחת צ'אט חכמה עם ניהול אישורים |
-| `/memorize` | POST | שמירת מידע בזיכרון לטווח ארוך (RAG) |
+| `/memorize` | POST | שמירת מידע בזיכרון לטווח ארוך |
 | `/execute` | POST | ביצוע פעולה ישיר |
 | `/webhook/whatsapp` | POST | קבלת תגובות מ-WhatsApp |
 | `/register_message_map` | POST | רישום מזהה הודעה לטלגרם |
 
-### דוגמה — ניתוח מייל
-
-```bash
-curl -X POST http://localhost:8080/analyze_email \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Subject: Meeting Request\nHi, can we meet next Tuesday at 10am?",
-    "source": "gmail",
-    "email_id": "msg_123"
-  }'
-```
-
 ---
 
+<div dir="rtl">
+
 ## 📁 מבנה הפרויקט
+
+</div>
 
 ```
 myOS/
@@ -232,7 +311,7 @@ myOS/
 │   └── finance_agent.py      # 💰 זיהוי חשבוניות, מעקב תשלומים
 ├── core/
 │   ├── protocols.py          # 📜 פרוטוקולים ומודלים משותפים
-│   └── state_manager.py      # 🔄 ניהול מצב ותהליך אישורים (HITL)
+│   └── state_manager.py      # 🔄 ניהול מצב ותהליך אישורים
 ├── utils/
 │   ├── gmail_tools.py        # ✉️ פונקציות Gmail API
 │   ├── gmail_connector.py    # 🔌 חיבור OAuth ל-Gmail
@@ -250,29 +329,48 @@ myOS/
 
 ---
 
+<div dir="rtl">
+
 ## 🔄 תרחישי שימוש
 
 ### 📧 ניתוח מייל נכנס
+
+</div>
+
 ```
-מייל חדש → n8n webhook → /analyze_email → סיווג (ספאם/פגישה/משימה)
-  → טיוטת תגובה / אירוע ביומן → התראה למשתמש → אישור → ביצוע
+New email → n8n webhook → /analyze_email → Classification (spam/meeting/task)
+  → Draft response / Calendar event → Notify user → Approval → Execute
 ```
+
+<div dir="rtl">
 
 ### 💬 שאלה חכמה (RAG)
+
+</div>
+
 ```
-"כמה שילמנו לחברת החשמל?" → /ask → חיפוש בזיכרון → תשובה מסוכמת
+"How much did we pay the electric company?" → /ask → Memory search → Summarized answer
 ```
 
+<div dir="rtl">
+
 ### ✅ אישור פעולה
+
+</div>
+
 ```
-"כן" בוואטסאפ → /webhook/whatsapp → ביצוע הפעולה הממתינה → ✅ בוצע
+"Yes" on WhatsApp → /webhook/whatsapp → Execute pending action → ✅ Done
 ```
 
 ---
 
+<div dir="rtl">
+
 ## ⚙️ קונפיגורציה
 
 קובץ `user_config.json` מאפשר להגדיר כללי סיווג מותאמים אישית:
+
+</div>
 
 ```json
 {
@@ -296,6 +394,8 @@ myOS/
 
 ---
 
+<div dir="rtl">
+
 ## 🗺️ מפת דרכים
 
 - [x] סוכן המזכירות — סיווג מיילים, ניסוח טיוטות, ניהול יומן
@@ -310,11 +410,17 @@ myOS/
 - [ ] סוכנים נוספים (LinkedIn, Slack)
 - [ ] התראות פרואקטיביות חכמות
 
+</div>
+
 ---
+
+<div dir="rtl">
 
 ## 🤝 תרומה
 
 הפרויקט נמצא בשלבי פיתוח מוקדמים. נשמח לתרומות!
+
+</div>
 
 1. Fork the repo
 2. Create your branch (`git checkout -b feature/amazing-feature`)
@@ -324,9 +430,13 @@ myOS/
 
 ---
 
+<div dir="rtl">
+
 ## 📄 רישיון
 
 פרויקט זה תחת רישיון MIT — ראה את קובץ [LICENSE](LICENSE) לפרטים.
+
+</div>
 
 ---
 
@@ -335,7 +445,5 @@ myOS/
 **נבנה עם ❤️ ו-AI**
 
 *myOS — כי את החיים שלך צריך לנהל כמו מערכת הפעלה.*
-
-</div>
 
 </div>
