@@ -31,40 +31,19 @@
 
 ---
 
-## 🎬 Demo — Email Analysis in Action
+## 🎬 Demo
 
-**Request** — Analyze an incoming interview invitation:
+### 🗑️ Automatic Spam Detection
 
-```bash
-curl -X POST http://localhost:8080/analyze_email \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Subject: Interview Invitation\nDear candidate, we would like to invite you for an interview on Sunday at 14:00.",
-    "source": "gmail",
-    "email_id": "msg_demo_001"
-  }'
-```
+A promotional email arrives in Gmail. myOS identifies keywords like "sale", "unsubscribe", and "70% off", classifies it as spam, and automatically moves it to trash — no user approval needed since the risk level is "safe".
 
-**Response** — The system classifies, drafts a reply, and asks for approval:
+![Spam email detected and auto-trashed](docs/demo_spam.png)
 
-```json
-{
-  "status": "success",
-  "classification": "MEETING",
-  "action_needed": true,
-  "summary": "🎯 Interview invitation! Sunday at 14:00",
-  "proposed_action": "schedule_event",
-  "draft_reply": "Hi, thank you for the invitation. I confirm my attendance on Sunday at 14:00.",
-  "approval_message": "📅 Schedule a calendar event and send confirmation?"
-}
-```
+### 📅 Meeting Scheduling — Full Approval Flow
 
-**What happens behind the scenes:**
-1. n8n detects new email and pushes to the server
-2. Secretariat Agent classifies → "Meeting Request"
-3. Checks calendar availability → Sunday 14:00 is free
-4. Drafts a reply + proposes a calendar event
-5. Sends you a WhatsApp message: "📅 Schedule event?" → You reply "Yes" → Done ✅
+A meeting request email arrives. myOS analyzes the content, checks the calendar for availability, drafts a professional reply, and sends an approval request via Telegram. The user replies "כן" (Yes) and the event is created in Google Calendar automatically.
+
+![Meeting scheduling via Telegram with calendar integration](docs/demo_meeting_flow.png)
 
 ---
 

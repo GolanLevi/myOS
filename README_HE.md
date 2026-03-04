@@ -37,46 +37,25 @@
 
 <div dir="rtl">
 
-## 🎬 הדגמה — תהליך ניתוח מייל
+## 🎬 הדגמה
 
-דוגמה לבקשת ניתוח מייל נכנס:
+### 🗑️ זיהוי ספאם אוטומטי
+
+מייל פרסומי מגיע ל-Gmail. המערכת מזהה מילות מפתח כמו "sale", "unsubscribe" ו-"70% off", מסווגת כספאם, ומעבירה אוטומטית לאשפה — ללא צורך באישור כי רמת הסיכון היא "safe".
 
 </div>
 
-```bash
-# שליחת מייל לניתוח
-curl -X POST http://localhost:8080/analyze_email \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Subject: Interview Invitation\nDear candidate, we would like to invite you for an interview on Sunday at 14:00.",
-    "source": "gmail",
-    "email_id": "msg_demo_001"
-  }'
-```
-
-```json
-// תגובת המערכת
-{
-  "status": "success",
-  "classification": "MEETING",
-  "action_needed": true,
-  "summary": "🎯 זומנת לראיון! יום ראשון ב-14:00",
-  "proposed_action": "schedule_event",
-  "draft_reply": "Hi, thank you for the invitation. I confirm my attendance on Sunday at 14:00.",
-  "approval_message": "📅 רוצה שאקבע ביומן ואשלח אישור?"
-}
-```
+![Spam email detected and auto-trashed](docs/demo_spam.png)
 
 <div dir="rtl">
 
-**מה קורה מאחורי הקלעים:**
-1. n8n מזהה מייל חדש ודוחף לשרת
-2. סוכן המזכירות מסווג → "בקשה לפגישה"
-3. בודק זמינות ביומן → יום ראשון 14:00 פנוי
-4. מכין טיוטת תגובה + הצעה לאירוע ביומן
-5. שולח לך הודעה בוואטסאפ: "📅 רוצה שאקבע ביומן?" → אתה עונה "כן" → בוצע ✅
+### 📅 קביעת פגישה — תהליך אישור מלא
+
+מייל עם בקשה לפגישה מגיע. המערכת מנתחת את התוכן, בודקת זמינות ביומן, מנסחת טיוטת תגובה מקצועית, ושולחת בקשת אישור דרך Telegram. המשתמש עונה "כן" והאירוע נוצר ביומן Google באופן אוטומטי.
 
 </div>
+
+![Meeting scheduling via Telegram with calendar integration](docs/demo_meeting_flow.png)
 
 ---
 
