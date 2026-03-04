@@ -39,6 +39,10 @@ A promotional email arrives in Gmail. myOS identifies keywords like "sale", "uns
 
 ![Spam email detected and auto-trashed](docs/demo_spam.png)
 
+**Server log** — the AI decision pipeline in real-time:
+
+![Terminal showing spam classification and auto-trash](docs/demo_spam_terminal.png)
+
 ### 📅 Meeting Scheduling — Full Approval Flow
 
 A meeting request email arrives. myOS analyzes the content, checks the calendar for availability, drafts a professional reply, and sends an approval request via Telegram. The user replies "כן" (Yes) and the event is created in Google Calendar automatically.
