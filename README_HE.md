@@ -1,193 +1,212 @@
-# myOS
+<div align="center">
 
-מערכת הפעלה אישית מבוססת AI לניהול מיילים, יומן, זיכרון ואישורים דרך טלגרם.
+# 🧠 myOS — מערכת הפעלה אישית מבוססת AI
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C)](https://www.langchain.com/langgraph)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> מערכת לתזמור סוכני AI עצמאית (self-hosted) שמחברת את Gmail, Google Calendar וטלגרם לזרימת עבודה אחת וחכמה, עם שמירה על פרטיות מלאה.
 
-[English](README.md)
+[🇬🇧 Read in English](README.md)
 
-## סקירה
+</div>
 
-`myOS` הוא פרויקט של עוזר אישי מקומי שמחבר בין Gmail, Google Calendar, Telegram, זיכרון וקטורי וסוכני AI למערכת אחת.
+---
 
-הרעיון המוביל של הפרויקט:
+## 📌 מה זה myOS?
 
-- ה-AI יכול לנתח, לסכם, לנסח ולהציע
-- פעולות רגישות חייבות לעצור לאישור מפורש של המשתמש
-- הנתונים והסודות נשארים בשליטה מקומית
+התחלתי לבנות את myOS כי טבעתי במיילים, פספסתי פגישות, וקפצתי כל הזמן בין אפליקציות שונות. במקום לחפש עוד כלי פרודוקטיביות, החלטתי לבנות אחד בעצמי — כזה שמבין הקשר, זוכר היסטוריה, ולא עושה שום דבר רגיש בלי האישור המפורש שלי.
 
-כרגע המערכת מתמקדת בארבעה מסלולים עיקריים:
+העיקרון הוא פשוט:
+- ה-AI **מנתח, מנסח ומציע** פעולות.
+- **פעולות רגישות** עוצרות ומחכות לאישור מפורש שלי דרך טלגרם.
+- כל המידע והמפתחות נשארים **על המחשב שלי**.
 
-- מיון וטיפול במיילים
-- תיאום פגישות ועדכון יומן
-- כרטיסי אישור בטלגרם עם כפתורים
-- זיכרון ארוך טווח באמצעות חיפוש וקטורי
+---
 
-## מצב נוכחי
+## ✅ מה המערכת יודעת לעשות כיום
 
-הקוד הנוכחי מריץ שרת FastAPI עם שכבת orchestration מבוססת LangGraph, בוט טלגרם מקומי, אינטגרציות ל-Gmail ול-Google Calendar, זיכרון דרך ChromaDB ושמירת state דרך MongoDB.
+| יכולת | תיאור |
+|---|---|
+| 📧 סיווג מיילים | מסווגת מיילים נכנסים — ספאם מטופל אוטומטית, כל השאר מקבל כרטיס מסודר |
+| ✍️ ניסוח תשובות | מנסחת תשובות מותאמות הקשר בעברית או אנגלית לפני ששולחת כלום |
+| 📅 תיאום פגישות | בודקת זמינות ביומן, מציעה שעות, ויוצרת אירועים אחרי אישור |
+| 🔄 תהליך אישור | שולחת כרטיסים לטלגרם עם כפתורים — אשר, דחה, או תן הכוונה ידנית |
+| 🧠 זיכרון ארוך-טווח | שומרת ומאחזרת הקשר בעזרת חיפוש וקטורי (ChromaDB + RAG) |
+| 🔒 Human-in-the-Loop | כלים רגישים (שליחת מייל, יצירת/מחיקת אירוע) **תמיד עוצרים לאישור** |
 
-`n8n` משמש כרגע בעיקר לשכבת ה-ingestion של Gmail. טלגרם מטופל ישירות מתוך אפליקציית ה-Python.
+---
 
-## מה המערכת יודעת לעשות היום
+## 🏗️ ארכיטקטורה
 
-- לקבל payload של מיילים נכנסים ולנתב אותם דרך LangGraph
-- לזהות ספאם והודעות בעלות ערך נמוך
-- להכין טיוטות מייל לפני שליחה
-- לבדוק חלונות זמן פנויים לפני הצעת פגישה
-- ליצור, לעדכן או לבטל אירועים מאחורי שער אישור אנושי
-- לשמור הקשר שיח ותהליך דרך MongoDB checkpoints
-- לשמור ולשלוף מידע שימושי דרך ChromaDB
-- לשלוח סיכומים ובקשות אישור לטלגרם עם inline buttons
-
-## דוגמאות שכדאי להציג בריפו
-
-אלה הנכסים הכי חזקים להצגה ציבורית:
-
-- [`docs/demo_spam.png`](docs/demo_spam.png): דוגמת מיון אוטומטי של ספאם
-- [`docs/demo_spam_terminal.png`](docs/demo_spam_terminal.png): trace של עיבוד בצד השרת
-- [`docs/demo_meeting_flow.png`](docs/demo_meeting_flow.png): זרימת אישור מלאה של פגישה בטלגרם
-- [`docs/n8n_workflow_export.cleaned.json`](docs/n8n_workflow_export.cleaned.json): ייצוא n8n נקי ומסונן
-- [`test_telegram_native_formatter.py`](test_telegram_native_formatter.py): בדיקה ממוקדת ל-UX של אישורים בטלגרם
-
-### מיון ספאם
-
-![Spam email detected and auto-triaged](docs/demo_spam.png)
-
-![Terminal trace for spam handling](docs/demo_spam_terminal.png)
-
-### אישור פגישה בטלגרם
-
-![Meeting scheduling flow in Telegram](docs/demo_meeting_flow.png)
-
-## ארכיטקטורה
+המערכת בנויה סביב **LangGraph Stateful Cyclic Graph** — הסוכן חושב, מפעיל כלים ומנתב בחזרה שוב ושוב, עד שהוא מסיים פעולה בטוחה או עוצר בנקודת אישור.
 
 ```mermaid
 graph TD
-    Gmail["Gmail דרך n8n"] --> API["שרת FastAPI"]
-    Telegram["בוט טלגרם מקומי"] <--> API
-    API --> Graph["LangGraph orchestration"]
-    Graph --> Sec["סוכן מזכירות"]
-    Graph --> Info["סוכן מידע"]
-    Sec --> GTools["כלי Gmail"]
-    Sec --> CTools["כלי Calendar"]
-    Info --> Chroma["זיכרון ChromaDB"]
-    Graph --> Mongo["MongoDB checkpoints/state"]
+    Gmail["📧 Gmail\n(via n8n)"] -->|POST /analyze_email| API
+    Telegram["💬 Telegram Bot\n(Native)"] <-->|POST /ask| API
+
+    subgraph API["⚡ FastAPI Server"]
+        Router["ניתוב בקשות\n+ לוגיקת אישור"]
+    end
+
+    API --> Graph
+
+    subgraph Graph["🔁 LangGraph Orchestration"]
+        Agent["🤖 Agent Node\n(Gemini Flash)"]
+        SafeTools["✅ כלים בטוחים\nread_email · search_contacts\nget_free_slots · get_events"]
+        SensitiveTools["⛔ כלים רגישים\nsend_email · create_event\nupdate_event · delete_event · trash_email"]
+
+        Agent -->|"route_tools()"| SafeTools
+        Agent -->|"route_tools()"| SensitiveTools
+        SafeTools --> Agent
+        SensitiveTools -.->|"BREAKPOINT\n(ממתין לאישור)"| Agent
+    end
+
+    Graph --> MongoDB["🗄️ MongoDB\nסטייט וצ'קפוינטים"]
+    Graph --> ChromaDB["🧠 ChromaDB\nזיכרון RAG"]
+    Graph --> GmailAPI["📬 Gmail API"]
+    Graph --> CalendarAPI["📅 Google Calendar API"]
 ```
 
-## סטאק טכנולוגי
+### איך תהליך ה-HITL עובד
 
-- Python 3.11
-- FastAPI + Uvicorn
-- LangChain + LangGraph
-- תמיכה בספקי LLM כמו Gemini, Anthropic ו-Groq
-- Google Gmail API + Google Calendar API
-- python-telegram-bot
-- ChromaDB
-- MongoDB
-- n8n
-- Docker Compose
+```
+מייל נכנס (דרך n8n)
+        │
+        ▼
+FastAPI /analyze_email
+        │
+        ▼
+סוכן LangGraph מנתח ────► פעולה בטוחה (לדוגמה, ספאם)?
+        │                               │
+        │                               ▼
+        │                         מבצע אוטומטית ✅
+        │
+        ▼
+נדרשת פעולה רגישה (שליחת תשובה, יצירת אירוע)?
+        │
+        ▼
+⛔ BREAKPOINT — הגרף מושהה
+        │
+        ▼
+כרטיס טלגרם נשלח למשתמש עם:
+  📋 תוכן הטיוטה
+  ⏰ מועד מוצע
+  📆 לוז יומי לאותו תאריך
+  [[BUTTONS: אשר | דחה | אני אגיב ידנית]]
+        │
+        ▼
+המשתמש לוחץ "אשר" ──► הגרף ממשיך ──► הכלי מופעל ──► ✅ סיום
+```
 
-## התחלה מהירה
+---
 
-### 1. שכפול
+## 🛠️ טכנולוגיות
 
+| שכבה | טכנולוגיה |
+|---|---|
+| **אורקסטרציה** | LangGraph (Stateful Cyclic Graph + Breakpoints) |
+| **LLM** | Google Gemini Flash (`gemini-flash-latest`) |
+| **API** | FastAPI + Uvicorn |
+| **זיכרון** | ChromaDB (RAG) + MongoDB (LangGraph checkpoints) |
+| **אינטגרציות** | Gmail API · Google Calendar API · Telegram Bot API |
+| **קבלת מיילים** | n8n (webhook trigger) |
+| **תשתית** | Docker Compose |
+| **שפה** | Python 3.11 |
+
+---
+
+## 🗂️ מבנה הפרויקט
+
+```
+myOS/
+├── agents/
+│   ├── langgraph_agent.py     # גרף LangGraph המרכזי, ניתוב כלים, נקודת HITL
+│   ├── information_agent.py   # סוכן RAG (זיכרון ChromaDB)
+│   └── finance_agent.py       # זיהוי חשבוניות ותשלומים (בפיתוח)
+│
+├── bot/
+│   ├── telegram_bot.py        # בוט טלגרם נייטיב, ניהול כפתורים
+│   └── message_formatter.py   # עיצוב כרטיסי אישור לטלגרם
+│
+├── core/
+│   ├── protocols.py           # סכמת ActionProposal וסיווג בטיחות
+│   └── state_manager.py       # ניהול אנשי קשר ומיפוי מזהי טלגרם
+│
+├── utils/
+│   ├── gmail_tools_lc.py      # כלי Gmail (תואם LangChain ToolNode)
+│   ├── calendar_tools_lc.py   # כלי Calendar (תואם LangChain ToolNode)
+│   └── logger.py              # לוגים מסודרים
+│
+├── server.py                  # נקודת כניסה FastAPI, לוגיקת אישור, הפעלת הגרף
+├── main.py                    # מריץ FastAPI + polling טלגרם במקביל
+├── docker-compose.yml         # סביבה מלאה (FastAPI, MongoDB, ChromaDB, n8n)
+└── user_config.json           # חוקי תזמון ועדפות הניתנים לשינוי
+```
+
+---
+
+## 🚀 התחלה מהירה
+
+### דרישות מוקדמות
+- Python 3.11+
+- Docker & Docker Compose
+- פרויקט Google Cloud עם Gmail + Calendar APIs מופעלים
+- מפתח Telegram Bot ([@BotFather](https://t.me/BotFather))
+- מפתח Google Gemini API
+
+### 1. שכפול המאגר
 ```bash
 git clone https://github.com/GolanLevi/myOS.git
 cd myOS
 ```
 
-### 2. קונפיגורציה מקומית
-
-- ליצור `.env` לפי [`.env.example`](.env.example)
-- לעדכן את [`user_config.json`](user_config.json) או להתחיל מ-[`user_config.example.json`](user_config.example.json)
-- לשים `credentials.json` בתיקיית השורש
-
-משתני סביבה מומלצים:
-
-```env
-GOOGLE_API_KEY=...
-GROQ_API_KEY=...
-ANTHROPIC_API_KEY=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-NGROK_AUTHTOKEN=...
-N8N_WEBHOOK_URL=https://your-public-url.example.com
+### 2. הגדרת משתני סביבה
+```bash
+cp .env.example .env
+# ערוך את .env עם מפתחות ה-API שלך
 ```
 
-### 3. אימות מול Google
-
+### 3. הרשאת גישה ל-Google
 ```bash
 python auth_setup.py
 ```
 
-הסקריפט יוצר `token.json` מקומי עבור Gmail ו-Google Calendar. הקובץ הזה מוחרג בכוונה מ-Git.
-
-### 4. הרצה עם Docker
-
+### 4. הרצה עם Docker Compose
 ```bash
-docker compose up --build
+docker-compose up
 ```
 
-השירותים ב-stack:
-
-- `server` - שרת FastAPI והבוט של טלגרם
-- `mongo` - שמירת state ו-checkpoints
-- `chromadb` - זיכרון וקטורי
-- `n8n` - workflow ingestion של Gmail
-- `ngrok` - tunnel אופציונלי לחשיפה מקומית
-
-### 5. הרצה מקומית בלי Docker
-
+### 5. הרצה ללא Docker
 ```bash
 pip install -r requirements.txt
 python main.py
 ```
 
-במצב מקומי צריך לוודא ש-MongoDB ו-ChromaDB זמינים.
+---
 
-## API עיקרי
+## 🔐 אבטחה ופרטיות
 
-- `GET /` - בדיקת בריאות
-- `POST /ask` - צ'אט, אישורים ובקשות למערכת
-- `POST /analyze_email` - ניתוח מיילים נכנסים
-- `POST /memorize` - שמירת טקסט לזיכרון ארוך טווח
-- `POST /execute` - endpoint ישן לתאימות
+- כל המפתחות והסיסמאות שמורים בקבצים מקומיים (`.env`, `credentials.json`) — לא מועלים ל-Git.
+- פעולות רגישות (שליחת מייל, יצירת/מחיקת אירועים) דורשות אישור מפורש לפני ביצוע.
+- תשובות תיאום פגישות חושפות רק חלונות זמינות — פרטי אירועים פרטיים לא נחשפים.
+- כל סטייט הגרף נשמר רק ב-MongoDB מקומי.
 
-## מבנה הריפו
+---
 
-```text
-myOS/
-|-- agents/                  # סוכנים וגרף LangGraph
-|-- bot/                     # בוט טלגרם ופורמט הודעות
-|-- core/                    # פרוטוקולים וניהול state
-|-- docs/                    # צילומי מסך ותיעוד תומך
-|-- utils/                   # כלי Gmail, Calendar, logging ו-tool wrappers
-|-- main.py                  # הרצת FastAPI ו-Telegram polling
-|-- server.py                # נקודת הכניסה הראשית
-|-- docker-compose.yml       # ה-stack המקומי
-|-- user_config.json         # קונפיגורציית דוגמה ציבורית
-|-- user_config.example.json # קובץ התחלה נוסף
-```
+## 🗺️ Roadmap
 
-## אבטחה ופרטיות
+- [ ] זרימת כספים: מזיהוי חשבוניות לתקצירי תשלום מוכנים לאישור
+- [ ] דשבורד קל-משקל לניטור סטייט וזיכרון בזמן אמת
+- [ ] אינטגרציה עם WhatsApp (via WAHA)
+- [ ] הרחבת כיסוי בדיקות ל-routing ב-LangGraph
 
-- סודות אמורים להישמר מקומית בקבצים כמו `.env`, `credentials.json` ו-`token.json`
-- הריפו הציבורי מנוקה מקבצי DB, טוקנים וייצואים אישיים
-- פעולות רגישות אמורות לעצור לאישור מפורש
-- תשובות על זמינות ביומן צריכות לחשוף תוצאה בלבד, לא פרטים אישיים
+---
 
-## Roadmap
+## 📄 רישיון
 
-- הרחבת ה-flow הפיננסי מזיהוי למסלול review מלא
-- הוספת dashboard קליל לניהול state, memory ואישורים
-- הגדלת כיסוי הבדיקות לניתוב של LangGraph ול-interception של tools
-- הוספת fixtures ודוגמאות importable לפיתוח מקומי
+MIT — ראה [LICENSE](LICENSE)
 
-## רישיון
+---
 
-MIT. ראו [LICENSE](LICENSE).
+## 👤 מפתח
+
+**גולן לוי** — [github.com/GolanLevi](https://github.com/GolanLevi)
