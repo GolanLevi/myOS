@@ -68,33 +68,25 @@ graph TD
 
 ### How the HITL Flow Works
 
-```
-Email Arrives (via n8n)
-        │
-        ▼
-FastAPI /analyze_email
-        │
-        ▼
-LangGraph Agent analyzes ─────► Safe action (e.g., spam detection)?
-        │                               │
-        │                               ▼
-        │                         Auto-execute ✅
-        │
-        ▼
-Sensitive action needed (e.g., send reply, create event)?
-        │
-        ▼
-⛔ BREAKPOINT — Graph pauses
-        │
-        ▼
-Telegram card sent to user with:
-  📋 Draft content
-  ⏰ Proposed time
-  📆 Daily agenda for that date
-  [[BUTTONS: Approve | Decline | Manual Instructions]]
-        │
-        ▼
-User taps "Approve" ──► Graph resumes ──► Tool executes ──► ✅ Done
+```mermaid
+graph TD
+    A["📧 Email Arrives\n(via n8n webhook)"] --> B["⚡ FastAPI\n(/analyze_email)"]
+    B --> C{"🤖 LangGraph Agent\nAnalyzes Context"}
+    
+    C -->|"Safe Action\n(e.g., Spam)"| D("✅ Auto-execute\n(Trash/Filter)")
+    
+    C -->|"Sensitive Action\n(e.g., Reply/Meet)"| E["⛔ BREAKPOINT\nGraph Pauses"]
+    
+    E --> F["💬 Telegram Card Sent\nShows: Draft, Times, Agenda"]
+    
+    F --> G{"👤 User Action\n(Inline Buttons)"}
+    
+    G -->|"Approve"| H["▶️ Graph Resumes"]
+    G -->|"Decline"| I("❌ Graph Drops Action")
+    G -->|"Manual Override"| J["✍️ Agent Generates\nNew Draft"]
+    
+    H --> K("✅ Tool Executes\n(Email Sent / Event Created)")
+    J --> E
 ```
 
 ---
