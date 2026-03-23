@@ -1,4 +1,5 @@
 import os
+from utils.logger import memory_logger
 import re
 import time
 import uuid
@@ -9,7 +10,7 @@ MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 
 class StateManager:
     def __init__(self):
-        print("💾 StateManager: Connecting to MongoDB...")
+        memory_logger.info("💾 Connecting to MongoDB...")
         try:
             self.client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
             # בדיקת חיבור
@@ -20,10 +21,10 @@ class StateManager:
             self.contacts = self.db["contacts"]
             # אינדקס ייחודי לפי משתמש + כתובת מייל (multi-tenant)
             self.contacts.create_index([("user_id", 1), ("email", 1)], unique=True)
-            print(f"✅ StateManager: Connected to MongoDB ({MONGODB_URL})")
+            memory_logger.info(f"✅ Connected to MongoDB ({MONGODB_URL})")
         except Exception as e:
-            print(f"❌ StateManager: MongoDB connection failed: {e}")
-            print("⚠️ StateManager: Falling back to in-memory mode!")
+            memory_logger.error(f"❌ MongoDB connection failed: {e}")
+            memory_logger.warning("⚠️ Falling back to in-memory mode!")
             self.client = None
             self.db = None
             self.actions = None
@@ -50,13 +51,13 @@ class StateManager:
             "updated_at": time.time()
         }
 
-        print(f"💾 StateManager: Saving action '{action_type}' (ID: {action_id})")
-
+        memory_logger.info(f"💾 Saving action '{action_type}' (ID: {action_id})")
         if self.actions is not None:
             self.actions.insert_one(doc)
         else:
             self._memory_actions[action_id] = doc
 
+        memory_logger.info(f"💾 Saving action '{action_type}' (ID: {action_id})")
         return action_id
 
     # --- מיפוי הודעות טלגרם ---
@@ -67,7 +68,7 @@ class StateManager:
         if not action:
             return False
 
-        print(f"🔗 StateManager: Mapped Telegram Msg {telegram_msg_id} -> Action {internal_id}")
+        memory_logger.info(f"🔗 Mapped Telegram Msg {telegram_msg_id} -> Action {internal_id}")
 
         if self.messages is not None:
             self.messages.update_one(
@@ -86,8 +87,9 @@ class StateManager:
         if self.messages is not None:
             mapping = self.messages.find_one({"telegram_id": str(telegram_msg_id)})
             if mapping:
-                action_id = mapping["action_id"]
-                return self._get_action_as_dict(action_id)
+                action_id = mapping.get("action_id")
+                if action_id:
+                    return self._get_action_as_dict(action_id)
         else:
             action_id = self._memory_messages.get(str(telegram_msg_id))
             if action_id:
@@ -133,11 +135,11 @@ class StateManager:
                 {"$set": {"status": "completed", "updated_at": time.time()}}
             )
             if result.modified_count > 0:
-                print(f"🧹 StateManager: Completed Action {action_id}")
+                memory_logger.info(f"🧹 Completed Action {action_id}")
         else:
             if action_id in self._memory_actions:
                 del self._memory_actions[action_id]
-                print(f"🧹 StateManager: Cleared Action {action_id}")
+                memory_logger.info(f"🧹 Cleared Action {action_id}")
 
     def clear_state(self, user_id: str):
         """מנקה את כל הפעולות הממתינות של משתמש מסוים"""
@@ -147,13 +149,13 @@ class StateManager:
                 {"$set": {"status": "completed", "updated_at": time.time()}}
             )
             if result.modified_count > 0:
-                print(f"🧹 StateManager: Completed {result.modified_count} actions for user '{user_id}'")
+                memory_logger.info(f"🧹 Completed {result.modified_count} actions for user '{user_id}'")
         else:
             ids_to_remove = [aid for aid, data in self._memory_actions.items() if data["user_id"] == user_id]
             for aid in ids_to_remove:
                 del self._memory_actions[aid]
             if ids_to_remove:
-                print(f"🧹 StateManager: Cleared {len(ids_to_remove)} actions for user '{user_id}'")
+                memory_logger.info(f"🧹 Cleared {len(ids_to_remove)} actions for user '{user_id}'")
 
     # --- פונקציות פנימיות ---
     def _get_action_doc(self, action_id: str):
@@ -217,7 +219,7 @@ class StateManager:
                 "interactions": existing.get("interactions", 0) + 1
             }
         
-        print(f"👤 Contact saved: {name} <{email}> (user: {user_id})")
+        memory_logger.info(f"👤 Contact saved: {name} <{email}> (user: {user_id})")
 
     def find_contacts(self, user_id: str, search_name: str) -> list:
         """מחפש אנשי קשר לפי שם (חיפוש גמיש — חלקי, עברית ואנגלית)"""

@@ -13,3 +13,13 @@ beautifulsoup4
 python-dateutil
 pdfplumber
 python-docx
+langchain
+langgraph
+langchain-google-genai
+langchain-community
+langchain-chroma
+langchain-mongodb
+langgraph-checkpoint-mongodb
+langchain-anthropic
+langchain-groq
+python-telegram-bot>=21.0

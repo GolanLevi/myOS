@@ -2,6 +2,7 @@ import base64
 import re
 import io
 from email.mime.text import MIMEText
+from email.header import Header
 from utils.gmail_connector import get_gmail_service
 
 try:
@@ -9,21 +10,21 @@ try:
     HAS_BS4 = True
 except ImportError:
     HAS_BS4 = False
-    print("⚠️ beautifulsoup4 not installed — HTML emails will be read as raw text")
+    print("beautifulsoup4 not installed - HTML emails will be read as raw text")
 
 try:
     import pdfplumber
     HAS_PDF = True
 except ImportError:
     HAS_PDF = False
-    print("⚠️ pdfplumber not installed — PDF attachments will not be readable")
+    print("pdfplumber not installed - PDF attachments will not be readable")
 
 try:
     import docx
     HAS_DOCX = True
 except ImportError:
     HAS_DOCX = False
-    print("⚠️ python-docx not installed — DOCX attachments will not be readable")
+    print("python-docx not installed - DOCX attachments will not be readable")
 
 
 def _extract_body_from_parts(parts, mime_type="text/plain"):
@@ -128,8 +129,8 @@ def _read_attachment_text(msg_id, attachment):
             if text_parts:
                 content = "\n".join(text_parts)
                 # קיצור אם ארוך מדי
-                if len(content) > 3000:
-                    content = content[:3000] + "\n... [הטקסט קוצר, 10 עמודים ראשונים]"
+                if len(content) > 2000:
+                    content = content[:2000] + "\n... [קוצר]"
                 return f"📄 תוכן {filename}:\n{content}"
             return f"[📎 {filename} — PDF ריק או סרוק (ללא טקסט)]"
         
@@ -167,7 +168,7 @@ def _read_attachment_text(msg_id, attachment):
             return f"[📎 {filename} — DOCX ריק (ללא טקסט)]"
         
     except Exception as e:
-        print(f"⚠️ Error reading attachment {filename}: {e}")
+        print(f"Error reading attachment {filename}: {e}")
         return f"[📎 {filename} — שגיאה בקריאה]"
     
     return None
@@ -252,7 +253,7 @@ def fetch_email_by_id(msg_id):
         
         return result
     except Exception as e:
-        print(f"❌ Error fetching email {msg_id}: {e}")
+        print(f"Error fetching email {msg_id}: {e}")
         return None
 
 
@@ -261,9 +262,14 @@ def fetch_recent_emails(limit=5):
     מושך את המיילים האחרונים מהתיבה (Inbox)
     מחזיר רשימה עם גוף מלא (לא רק snippet)
     """
+    # Hard cap for stability and token savings
+    if limit > 10:
+        print(f"Limit {limit} is too high. Capping to 10 emails.")
+        limit = 10
+
     service = get_gmail_service()
     
-    print(f"📥 Fetching last {limit} emails...")
+    print(f"Fetching last {limit} emails...")
     
     results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=limit).execute()
     messages = results.get('messages', [])
@@ -289,44 +295,51 @@ def fetch_recent_emails(limit=5):
     
     return clean_emails
 
-def create_draft(to_email, subject, body):
+def create_draft(to_email, subject, body, thread_id=None):
     """
     יוצר טיוטה חדשה ב-Gmail (לא שולח, רק שומר ב-Drafts)
+    thread_id: אופציונלי - אם מסופק, הטיוטה תוגש כחלק מה-thread הקיים (כמו "Reply")
     """
     service = get_gmail_service()
     
-    message = MIMEText(body)
+    message = MIMEText(body, _charset="utf-8")
     message['to'] = to_email
-    message['subject'] = subject
+    message['subject'] = Header(subject, "utf-8")
     
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    body = {'message': {'raw': raw}}
+    draft_body = {'message': {'raw': raw}}
+    if thread_id:
+        draft_body['message']['threadId'] = thread_id
     
     try:
-        draft = service.users().drafts().create(userId='me', body=body).execute()
-        print(f"📝 Draft created! ID: {draft['id']}")
+        draft = service.users().drafts().create(userId='me', body=draft_body).execute()
+        print(f"Draft created. ID: {draft['id']}")
         return draft
     except Exception as e:
-        print(f"❌ Error creating draft: {e}")
+        print(f"Error creating draft: {e}")
         return None
 
-def send_email(to_email, subject, body):
-    """שולח מייל מיידית דרך ה-API"""
+def send_email(to_email, subject, body, thread_id=None):
+    """שולח מייל מיידית דרך ה-API
+    thread_id: אופציונלי - מאפשר לשלוח כחלק מ-thread קיים (כמו "Reply")
+    """
     service = get_gmail_service()
     try:
-        message = MIMEText(body)
+        message = MIMEText(body, _charset="utf-8")
         message['to'] = to_email
-        message['subject'] = subject
+        message['subject'] = Header(subject, "utf-8")
         
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        body = {'raw': raw_message}
+        send_body = {'raw': raw_message}
+        if thread_id:
+            send_body['threadId'] = thread_id
         
-        sent_message = service.users().messages().send(userId='me', body=body).execute()
-        print(f"📧 Email Sent! ID: {sent_message['id']}")
+        sent_message = service.users().messages().send(userId='me', body=send_body).execute()
+        print(f"Email sent. ID: {sent_message['id']}")
         return sent_message['id']
         
     except Exception as e:
-        print(f"❌ Error sending email: {e}")
+        print(f"Error sending email: {e}")
         return None
 
 
@@ -343,11 +356,22 @@ def create_label(label_name):
         
         label_object = {'name': label_name, 'labelListVisibility': 'labelShow', 'messageListVisibility': 'show'}
         created = service.users().labels().create(userId='me', body=label_object).execute()
-        print(f"🏷️ Label created: {label_name}")
+        print(f"Label created: {label_name}")
         return created['id']
     except Exception as e:
-        print(f"❌ Error creating label: {e}")
+        print(f"Error creating label: {e}")
         return None
+
+def remove_label(msg_id, label_id_or_name):
+    """מסיר תווית ממייל ספציפי לפי שם או ID (שימושי ל-mark_as_read וכו')"""
+    service = get_gmail_service()
+    # Gmail built-in labels like UNREAD, INBOX can be used directly by their string name as ID
+    try:
+        body = {'removeLabelIds': [label_id_or_name]}
+        service.users().messages().modify(userId='me', id=msg_id, body=body).execute()
+        print(f"Label '{label_id_or_name}' removed from email {msg_id}")
+    except Exception as e:
+        print(f"Error removing label: {e}")
 
 def add_label_to_email(msg_id, label_name):
     """מוסיף תווית למייל ספציפי"""
@@ -358,9 +382,9 @@ def add_label_to_email(msg_id, label_name):
         try:
             body = {'addLabelIds': [label_id]}
             service.users().messages().modify(userId='me', id=msg_id, body=body).execute()
-            print(f"🏷️ Label '{label_name}' added to email {msg_id}")
+            print(f"Label '{label_name}' added to email {msg_id}")
         except Exception as e:
-            print(f"❌ Error adding label: {e}")
+            print(f"Error adding label: {e}")
 
 def archive_email(msg_id):
     """מעביר מייל לארכיון (מסיר אותו מה-Inbox)"""
@@ -368,17 +392,17 @@ def archive_email(msg_id):
     try:
         body = {'removeLabelIds': ['INBOX']}
         service.users().messages().modify(userId='me', id=msg_id, body=body).execute()
-        print(f"🗄️ Email {msg_id} archived.")
+        print(f"Email {msg_id} archived.")
     except Exception as e:
-        print(f"❌ Error archiving email: {e}")
+        print(f"Error archiving email: {e}")
 
 def trash_email(msg_id):
     """מעביר מייל לאשפה (Trash)"""
     service = get_gmail_service()
     try:
         service.users().messages().trash(userId='me', id=msg_id).execute()
-        print(f"🗑️ Email {msg_id} moved to TRASH.")
+        print(f"Email {msg_id} moved to TRASH.")
         return True
     except Exception as e:
-        print(f"❌ Error trashing email: {e}")
+        print(f"Error trashing email: {e}")
         return False

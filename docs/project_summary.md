@@ -1,129 +1,48 @@
-# סיכום פרויקט myOS - דוח טכני מלא
+# myOS Project Summary
 
-מסמך זה מרכז את כל המידע על המערכת שבנינו, כולל ארכיטקטורה, רכיבים, פונקציות, וחיבורים ל-N8N.
+## One-Line Summary
 
-## 1. סקירה כללית (Overview)
-המערכת היא **עוזר אישי מבוסס AI** הפועל בארכיטקטורת Client-Server. המוח (Server) רץ מקומית על המחשב שלך וחושף API, בעוד N8N משמש כ"ידיים והרגליים" לחיבור לעולם החיצון (Gmail, WhatsApp, Telegram).
+`myOS` is a local-first AI assistant that helps manage email, calendar, memory, and approvals through a unified FastAPI and Telegram workflow.
 
-העיקרון המוביל הוא **Human-in-the-Loop**: ה-AI מנתח ומציע, אבל פעולות רגישות (כמו תשלום או מחיקת מיילים) מחייבות אישור שלך.
+## Current Focus
 
----
+The repository currently emphasizes:
 
-## 2. רכיבי השרת (Server & Main Entry)
+- LangGraph orchestration for operational tasks
+- Native Telegram approvals instead of outsourced chat handling
+- Gmail ingestion via n8n
+- Google Calendar scheduling with approval gates
+- ChromaDB memory and MongoDB-backed state/checkpoints
 
-### `server.py` (הלב הפועם)
-זהו קובץ ה-FastAPI שמנהל את כל התקשורת מול N8N. הוא מאתחל את הסוכנים ומנתב את הבקשות.
+## Public Demo Story
 
-**נקודות קצה (Endpoints):**
+The strongest repository story today is:
 
-1.  **`POST /analyze_email`**
-    *   **תפקיד**: מקבל טקסט של מייל מ-N8N, שולח לסוכן המזכירות (`SecretariatAgent`) לניתוח.
-    *   **לוגיקה**:
-        *   אם זה **ספאם**: מכין הוראת מחיקה (`trash`).
-        *   אם זו **פגישה**: בודק יומן, יוצר טיוטה לתשובה, ומבקש אישור לזימון ביומן.
-        *   אם זו **משימה**: מזהה ומציע עדכון.
-    *   **פלט**: JSON עם `action_needed` וטקסט לאישור/שליחה.
+1. An email arrives through Gmail and n8n.
+2. The FastAPI server routes it through LangGraph.
+3. The system summarizes it, prepares a draft or meeting action, and pauses.
+4. Telegram presents the decision to the user.
+5. The user approves, rejects, or edits the action.
 
-2.  **`POST /ask`**
-    *   **תפקיד**: המוח לשיחה (Chat). משמש לרוב מול טלגרם/ממשק צ'אט.
-    *   **לוגיקה**:
-        *   בודק האם המשתמש עונה על בקשת אישור קודמת ("כן", "מאשר").
-        *   אם כן -> מפעיל את הפעולה הממתינה (דרך `StateManager`).
-        *   אם לא -> שולח את השאלה ל-`InformationAgent` (RAG) לתשובה מתוך הידע הצבור.
+This story is already supported by the screenshots in `docs/` and the Telegram formatter tests in the root of the repository.
 
-3.  **`POST /webhook/whatsapp`**
-    *   **תפקיד**: קבלת תשובות מהמשתמש דרך וואטסאפ.
-    *   **לוגיקה**: מזהה מילות מפתח ("כן", "בטל") כדי לאשר או לדחות פעולות שממתינות לאישור.
+## What Should Be Public
 
-4.  **`POST /memorize`**
-    *   **תפקיד**: שמירת מידע בזיכרון לטווח ארוך (`ChromaDB`).
+- Source code for orchestration, tools, bot, and state handling
+- Sanitized screenshots and workflow exports
+- Example configuration files
+- Focused tests that demonstrate behavioral quality
 
-5.  **`POST /execute`**
-    *   **תפקיד**: ביצוע פעולות ישיר (לצורכי בדיקות או עקיפת לוגיקה).
+## What Should Stay Private
 
----
+- `.env`, `credentials.json`, `token.json`
+- Local databases and exported SQLite snapshots
+- Personal workflow exports with live IDs or sensitive content
+- Personal documents and scratch files
 
-## 3. הסוכנים (Agents)
+## Recommended Next Improvements
 
-כל סוכן הוא מחלקה עצמאית עם התמחות ספציפית וחיבור למודל שפה.
-
-### א. `agents/secretariat_agent.py` (סוכן המזכירות)
-הסוכן הפעיל ביותר. אחראי על סינון מיילים, יומן, וניסוח הודעות. מכיל הגדרות בטיחות למניעת צנזורה מיותרת של ה-AI.
-
-*   **`__init__`**: טוען קונפיגורציה ומתחבר ל-`gemini-3-flash-preview`.
-*   **`process(user_input)`**: הפונקציה הראשית.
-    *   מושכת את הלו"ז לשבוע הקרוב (`get_upcoming_events`).
-    *   שולחת ל-Gemini את המייל + הלו"ז + הוראות לפרמט תשובה ב-HTML.
-    *   מחזירה אובייקט `ActionProposal` עם סיווג (SPAM, MEETING, ACTIVE_TASK).
-*   **`execute_instruction(instruction)`**: מבצעת פיזית את הפעולה (יצירת טיוטה, זימון ביומן) באמצעות כלי ה-Utils.
-
-### ב. `agents/information_agent.py` (סוכן המידע והארכיון)
-ה"ספרן" של המערכת. אחראי על הזיכרון (RAG).
-
-*   **`__init__`**: מתחבר ל-`ChromaDB` (מסד נתונים וקטורי) ול-`gemini-1.5-pro-latest`.
-*   **`memorize(text)`**: שומר פיסת מידע חדשה בזיכרון (מונע כפילויות).
-*   **`recall(query)`**: שולף את המסמכים הכי רלוונטיים לשאילתה.
-*   **`ask_brain(user_question)`**:
-    1.  שולף מיילים/מידע רלוונטי מהזיכרון.
-    2.  שולח ל-Gemini את המידע כ"הקשר" (Context) יחד עם השאלה.
-    3.  מחזיר תשובה מסוכמת בעברית.
-
-### ג. `agents/finance_agent.py` (סוכן הכספים)
-*מוכן לשימוש אך טרם חובר מלא ב-server.py הנוכחי.*
-*   **`process`**: מזהה חשבוניות, קבלות, ובקשות תשלום. מפיק JSON עם סכום, תאריך וספק.
-
----
-
-## 4. מנהלי הליבה (Core & State)
-
-### `core/manager.py` (AgentManager)
-מחלקה לניהול לוגיקה עסקית (ניתוב, לוגים).
-*   **`process_incoming_request`**: מנתב בקשות לסוכן המתאים לפי מילות מפתח.
-*   **`_handle_proposal`**: בודק רמת סיכון (Risk Level). אם גבוה -> עוצר ומבקש אישור.
-*   **`_execute_action`**: מפעיל את הכלים בפועל.
-
-### `core/state_manager.py` (לא הוצג בקוד אך מיובא)
-אחראי על שמירת ה"הקשר" (State) בין בקשת האישור לבין תשובת המשתמש. מאפשר למערכת "לזכור" על מה ענית "כן".
-
----
-
-## 5. כלי עזר (Utils)
-
-### `utils/gmail_tools.py`
-ספריית פונקציות לעבודה מול Gmail API.
-1.  `fetch_recent_emails(limit)`: קריאת מיילים אחרונים.
-2.  `create_draft(to, subject, body)`: יצירת טיוטה (לא שולח, רק שומר).
-3.  `trash_email(msg_id)`: העברה לאשפה.
-4.  `archive_email(msg_id)`: העברה לארכיון.
-5.  `add_label_to_email(msg_id, label)`: תיוג מיילים.
-
-### `utils/calendar_tools.py`
-ספריית פונקציות לעבודה מול Google Calendar API.
-1.  `get_upcoming_events(days)`: מחזיר רשימת אירועים בפורמט טקסט נקי, כדי שה-AI יבין מתי אתה עסוק.
-2.  `schedule_event(summary, start_time, ...)`: יוצר אירוע חדש ביומן.
-
----
-
-## 6. חיבורי N8N ופרוטוקולים
-
-המערכת מסתמכת על N8N שישמש כ"גשר". הנה הזרימה (Flows) הנפוצה:
-
-### תרחיש א': ניתוח מייל נכנס (Email Ingestion)
-1.  **Gmail Trigger (N8N)**: מזהה מייל חדש.
-2.  **HTTP Request (N8N)**: שולח את תוכן המייל ל-`http://localhost:8000/analyze_email`.
-3.  **Server**: מנתח, מכין טיוטה, ובודק סיכונים.
-4.  **Response**: השרת מחזיר ל-N8N תשובה עם טקסט להודעה.
-5.  **Telegram/WhatsApp Node (N8N)**: שולח לך הודעה: "הגיע מייל מ-X, הכנתי טיוטה. לאשר?".
-
-### תרחיש ב': אישור פעולה (User Approval)
-1.  **WhatsApp Trigger (N8N)**: אתה עונה "כן" בוואטסאפ.
-2.  **HTTP Request (N8N)**: שולח את ה"כן" ל-`http://localhost:8000/webhook/whatsapp`.
-3.  **Server**: מבין שזה אישור לפעולה הממתינה, ומבצע אותה (למשל, שולח את הטיוטה או קובע פגישה).
-4.  **Response**: השרת מחזיר "בוצע בהצלחה".
-5.  **WhatsApp Node**: שולח לך וי קטן ✅.
-
-### תרחיש ג': שאלות ותשובות (RAG Chat)
-1.  **Telegram Trigger**: אתה שואל "כמה שילמנו לחברת החשמל?".
-2.  **HTTP Request**: נשלח ל-`POST /ask`.
-3.  **Server (InformationAgent)**: מחפש בהיסטוריה ועונה.
-4.  **Telegram Node**: מציג לך את התשובה.
+- Add CI for at least one focused test file
+- Add a small `docs/setup.md` for onboarding
+- Add a sanitized request/response fixture for `/analyze_email`
+- Add screenshots of Telegram approval cards in both English and Hebrew scenarios

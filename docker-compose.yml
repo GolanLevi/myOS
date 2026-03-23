@@ -13,14 +13,20 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017
       - CHROMA_HOST=chromadb
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TZ=Asia/Jerusalem
+    env_file:
+      - .env
     depends_on:
       - mongo
       - chromadb
-    command: uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+    command: python main.py
 
   mongo:
     image: mongo:latest
     container_name: myos_mongo
+    command: [ "mongod", "--quiet", "--logpath", "/dev/null" ]
     ports:
       - "27017:27017"
     volumes:
@@ -42,7 +48,8 @@ services:
     environment:
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
-      - WEBHOOK_URL=https://genetic-garlicky-thurman.ngrok-free.dev # הכתובת שמצאת!
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - TZ=Asia/Jerusalem
     volumes:
       - n8n_data:/home/node/.n8n
 

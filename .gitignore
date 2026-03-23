@@ -1,37 +1,60 @@
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
 env/
 venv/
 
-# Environment Variables & Secrets
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
 payload.json
 credentials.json
 token.json
 client_secret.json
+*.pem
+*.key
 
 # IDEs
 .vscode/
 .idea/
 
-# Docker
+# Docker and local overrides
 docker-compose.override.yml
 
-# Project specific
+# Runtime data
 waha_sessions/
 logs/
 chroma_data/
 mongo_data/
 n8n_data/
+*.sqlite
+*.sqlite-*
+*.db
 
-# AI workspace temp files
+# Local project artifacts
+.skill-build/
 implementation_plan.md
 task.md
 walkthrough.md
+full_model_list.txt
+cv_text.txt
+server_legacy.py
+test_langgraph.py
+tmp_n8n_database.sqlite
+tmp_n8n_database_after.sqlite
+docs/n8n_database.backup.sqlite
+docs/n8n_database.pre_cleanup.sqlite
+docs/n8n_workflow_export.json
+
+# Local user configuration
+user_config.local.json
+!user_config.example.json
 
 # Test assets
 test_image.jpg
