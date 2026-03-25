@@ -11,6 +11,22 @@
 
 ---
 
+### 🛠️ My Tech Stack
+
+**Generative AI & Tech:**  
+![LangGraph](https://img.shields.io/badge/LangGraph-1C1C1C?style=for-the-badge) ![Gemini Flash](https://img.shields.io/badge/Gemini_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white) ![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6C37?style=for-the-badge)
+
+**Backend & Database:**  
+![Python](https://img.shields.io/badge/Python_3.11-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+
+**Automation & Interface:**  
+![n8n](https://img.shields.io/badge/n8n-FF6D5A?style=for-the-badge&logo=n8n&logoColor=white) ![Telegram Bot API](https://img.shields.io/badge/Telegram_Bot_API-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)
+
+**Tools & Environment:**  
+![Codex](https://img.shields.io/badge/Codex-000000?style=for-the-badge&logo=openai&logoColor=white) ![Antigravity](https://img.shields.io/badge/Antigravity-8A2BE2?style=for-the-badge)
+
+---
+
 ## � Why I Built This?
 I was tired of wasting time manually managing my emails and context-switching between apps just to schedule a meeting. I wanted a digital twin that does the heavy lifting:
 
@@ -74,11 +90,4 @@ def build_secretariat_graph(checkpointer):
     )
 ```
 
----
 
-## 🛠️ Tech Stack
-*   **Logic:** LangGraph, Gemini Flash, ChromaDB.
-*   **Backend:** FastAPI, Python 3.11.
-*   **Database:** MongoDB (Persistence).
-*   **Automation:** n8n.
-*   **Interface:** Telegram Bot API.
