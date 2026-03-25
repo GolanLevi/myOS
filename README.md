@@ -74,8 +74,8 @@ The brain of the operation lives in `secretariat_graph.py` and is served by `man
 
 ```mermaid
 graph TD
-    A["📧 Email Arrives\n(n8n webhook)"] --> B["⚡ FastAPI\n(/analyze_email)"]
-    B --> C{"🤖 LangGraph Agent\n(Gemini Flash)"}
+    A["📧 Email Arrives\n(n8n webhook)"] --> B["⚡ manager_api.py\n(/analyze_email)"]
+    B --> C{"🤖 secretariat_graph.py\n(Gemini Flash)"}
     
     C -->|"Safe Action\n(read_email, get_slots)"| D("🔁 Loops back to Agent")
     

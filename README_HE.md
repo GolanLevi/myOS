@@ -74,8 +74,8 @@
 
 ```mermaid
 graph TD
-    A["📧 כניסת מייל\n(דרך n8n)"] --> B["⚡ FastAPI\n(/analyze_email)"]
-    B --> C{"🤖 סוכן LangGraph\n(Gemini Flash)"}
+    A["📧 כניסת מייל\n(דרך n8n)"] --> B["⚡ manager_api.py\n(/analyze_email)"]
+    B --> C{"🤖 secretariat_graph.py\n(Gemini Flash)"}
     
     C -->|"כלי עזר/קריאה\n(בדיקת יומן, שליפת מייל)"| D("🔁 חוזר לעצמו מיד להמשך המחשבה")
     
