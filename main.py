@@ -4,11 +4,11 @@ import threading
 
 import uvicorn
 
-from server import get_telegram_bot, server_logger, set_telegram_bot
+from manager_api import get_telegram_bot, server_logger, set_telegram_bot
 
 
 def run_api() -> None:
-    config = uvicorn.Config("server:app", host="0.0.0.0", port=8000, log_level="info")
+    config = uvicorn.Config("manager_api:app", host="0.0.0.0", port=8000, log_level="info")
     server = uvicorn.Server(config)
     server.run()
 

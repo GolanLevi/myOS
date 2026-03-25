@@ -32,6 +32,10 @@ class AttachmentInput(BaseModel):
     msg_id: str = Field(..., description="The ID of the email containing the attachment.")
     attachment_id: str = Field(..., description="The specific ID of the attachment to download.")
 
+
+class EmailArtifactsInput(BaseModel):
+    msg_id: str = Field(..., description="The ID of the email to inspect.")
+
 # --- Tools ---
 
 @tool("fetch_recent_emails")
@@ -52,7 +56,8 @@ def fetch_recent_emails(limit: int = 5) -> str:
                 "sender": e.get("sender"),
                 "subject": e.get("subject"),
                 "snippet": e.get("snippet"),
-                "has_attachments": bool(e.get("attachments"))
+                "has_attachments": bool(e.get("attachments")),
+                "reply_possible": bool(e.get("reply_possible", True)),
             })
         return json.dumps(optimized, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -93,6 +98,40 @@ def fetch_full_email(msg_id: str) -> str:
         return json.dumps(email_data, ensure_ascii=False, indent=2)
     except Exception as e:
         return f"Error fetching full email: {str(e)}"
+
+
+@tool("inspect_email_artifacts", args_schema=EmailArtifactsInput)
+def inspect_email_artifacts(msg_id: str) -> str:
+    """Return verified email metadata for decision-making: sender, replyability, attachment names, and calendar-invite presence.
+    Use this when you need to decide whether a draft is possible, whether attachments are truly present, or whether the email is likely a no-reply notification.
+    """
+    try:
+        email_data = base_gmail.fetch_email_by_id(msg_id)
+        if not email_data:
+            return "Email not found."
+        payload = {
+            "id": email_data.get("id"),
+            "threadId": email_data.get("threadId"),
+            "sender": email_data.get("sender"),
+            "sender_name": email_data.get("sender_name"),
+            "sender_email": email_data.get("sender_email"),
+            "reply_to_email": email_data.get("reply_to_email"),
+            "effective_reply_email": email_data.get("effective_reply_email"),
+            "reply_possible": bool(email_data.get("reply_possible")),
+            "subject": email_data.get("subject"),
+            "has_calendar_invite": bool(email_data.get("has_calendar_invite")),
+            "attachments": [
+                {
+                    "filename": item.get("filename"),
+                    "mimeType": item.get("mimeType"),
+                    "size": item.get("size"),
+                }
+                for item in email_data.get("attachments", [])
+            ],
+        }
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return f"Error inspecting email artifacts: {str(e)}"
 
 @tool("create_draft", args_schema=CreateDraftInput)
 def create_draft(to_email: str, subject: str, body: str, thread_id: Optional[str] = None) -> str:
@@ -200,6 +239,7 @@ gmail_tools = [
     fetch_recent_emails,
     search_emails,
     fetch_full_email,
+    inspect_email_artifacts,
     create_draft,
     send_email,
     mark_as_read,

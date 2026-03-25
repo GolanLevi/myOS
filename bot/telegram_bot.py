@@ -9,7 +9,7 @@ from typing import Any, Mapping, Sequence
 import requests
 from dotenv import load_dotenv
 
-from core.state_manager import StateManager
+from core.state_manager import WorkflowStateStore
 from utils.logger import memory_logger, server_logger
 
 from .message_formatter import ButtonSpec, PreparedMessage, build_callback_data, prepare_message, prepare_server_response
@@ -55,7 +55,7 @@ class TelegramNativeBot:
         bot_token: str | None = None,
         api_base_url: str | None = None,
         default_chat_id: int | None = None,
-        state_manager: StateManager | None = None,
+        state_manager: WorkflowStateStore | None = None,
         request_timeout: int = 60,
     ) -> None:
         if _TELEGRAM_IMPORT_ERROR is not None:
@@ -72,7 +72,7 @@ class TelegramNativeBot:
         self.api_base_url = (api_base_url or DEFAULT_API_BASE_URL).rstrip("/")
         self.default_chat_id = default_chat_id if default_chat_id is not None else _safe_int(DEFAULT_CHAT_ID)
         self.request_timeout = request_timeout
-        self.state_manager = state_manager or StateManager()
+        self.state_manager = state_manager or WorkflowStateStore()
 
         self.application = ApplicationBuilder().token(token).build()
         self._register_handlers()
@@ -355,3 +355,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

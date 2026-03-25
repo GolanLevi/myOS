@@ -8,7 +8,7 @@ from pymongo import MongoClient
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 
 
-class StateManager:
+class WorkflowStateStore:
     def __init__(self):
         memory_logger.info("💾 Connecting to MongoDB...")
         try:
@@ -270,3 +270,7 @@ class StateManager:
             ).sort("interactions", -1))
         else:
             return [c for c in self._memory_contacts.values() if c.get("user_id") == user_id]
+
+
+# Backward-compatible alias during the naming transition.
+StateManager = WorkflowStateStore

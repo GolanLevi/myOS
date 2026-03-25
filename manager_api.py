@@ -13,14 +13,14 @@ from pymongo import MongoClient
 from langgraph.checkpoint.mongodb import MongoDBSaver
 
 # ייבוא הסוכנים והכלים
-from agents.information_agent import InformationAgent
-from core.state_manager import StateManager
+from agents.information_agent import KnowledgeAgent
+from core.state_manager import WorkflowStateStore
 from utils.calendar_tools import get_upcoming_events, get_events_for_date, normalize_event_summary
-from utils.gmail_tools import fetch_email_by_id
+from utils.gmail_tools import fetch_email_by_id, send_email as gmail_send_email
 
 # ייבוא הגרף החדש
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage, BaseMessage
-from agents.langgraph_agent import build_graph
+from agents.secretariat_graph import build_secretariat_graph
 
 from utils.logger import server_logger, memory_logger
 import threading
@@ -67,8 +67,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 email_processing_lock = threading.Lock()
 
 server_logger.info("👔 Manager: Initializing MyOS Team (LangGraph Edition)...")
-librarian = InformationAgent()
-state_manager = StateManager() # נשתמש בו רק לטובת עדכון אנשי קשר ומיפוי Telegram IDs
+knowledge_agent = KnowledgeAgent()
+workflow_state_store = WorkflowStateStore() # נשתמש בו רק לטובת עדכון אנשי קשר ומיפוי Telegram IDs
 
 # אתחול חיבור MongoDB לטובת LangGraph
 mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
@@ -76,7 +76,7 @@ try:
     mongo_client = MongoClient(mongo_url)
     checkpoint_collection = mongo_client["myos_langgraph"]["checkpoints"]
     checkpointer = MongoDBSaver(checkpoint_collection)
-    graph = build_graph(checkpointer)
+    graph = build_secretariat_graph(checkpointer)
     server_logger.info("✅ Manager: LangGraph and Memory initialized!")
 except Exception as e:
     server_logger.error(f"❌ LangGraph setup Error: {e}")
@@ -146,7 +146,7 @@ def home():
 # --- 1. זיכרון (RAG) ---
 @app.post("/memorize")
 def memorize_info(payload: RequestModel):
-    librarian.memorize(payload.text, source=payload.source)
+    knowledge_agent.memorize(payload.text, source=payload.source)
     msg = "Saved to memory"
     return {"status": "success", "message": msg, "answer": msg, "draft": msg}
 
@@ -227,7 +227,17 @@ def _display_name_from_sender(raw_sender: str) -> str:
 
 
 def _extract_email_context_from_messages(messages: list[BaseMessage]) -> dict[str, str]:
-    context = {"sender": "", "subject": "", "content": "", "when_hint": ""}
+    context = {
+        "sender": "",
+        "subject": "",
+        "content": "",
+        "when_hint": "",
+        "reply_possible": "",
+        "sender_type": "",
+        "attachments_verified": "",
+        "attachment_names": "",
+        "has_calendar_invite": "",
+    }
     for msg in reversed(messages):
         if not isinstance(msg, HumanMessage):
             continue
@@ -235,13 +245,24 @@ def _extract_email_context_from_messages(messages: list[BaseMessage]) -> dict[st
         if "Email Content:" not in text:
             continue
 
-        sender_match = re.search(r"From:\s*(.+)", text)
-        subject_match = re.search(r"Subject:\s*(.+)", text)
-        content_match = re.search(r"Content:\s*(.+)", text, re.DOTALL)
+        line_flags = re.MULTILINE
+        sender_match = re.search(r"^From:\s*(.+)$", text, line_flags)
+        subject_match = re.search(r"^Subject:\s*(.+)$", text, line_flags)
+        reply_possible_match = re.search(r"^Reply-Possible:\s*(.+)$", text, line_flags)
+        sender_type_match = re.search(r"^Sender-Type:\s*(.+)$", text, line_flags)
+        attachments_verified_match = re.search(r"^Attachments-Verified:\s*(.+)$", text, line_flags)
+        attachment_names_match = re.search(r"^Attachment-Names:\s*(.+)$", text, line_flags)
+        calendar_invite_match = re.search(r"^Has-Calendar-Invite:\s*(.+)$", text, line_flags)
+        content_match = re.search(r"^Content:\s*(.+)", text, re.MULTILINE | re.DOTALL)
         lower_text = text.lower()
 
         context["sender"] = sender_match.group(1).strip() if sender_match else ""
         context["subject"] = subject_match.group(1).strip() if subject_match else ""
+        context["reply_possible"] = reply_possible_match.group(1).strip().lower() if reply_possible_match else ""
+        context["sender_type"] = sender_type_match.group(1).strip().lower() if sender_type_match else ""
+        context["attachments_verified"] = attachments_verified_match.group(1).strip().lower() if attachments_verified_match else ""
+        context["attachment_names"] = attachment_names_match.group(1).strip() if attachment_names_match else ""
+        context["has_calendar_invite"] = calendar_invite_match.group(1).strip().lower() if calendar_invite_match else ""
         context["content"] = _strip_nested_email_metadata(content_match.group(1).strip()) if content_match else ""
 
         if "tomorrow morning" in lower_text or "מחר בבוקר" in text:
@@ -381,6 +402,46 @@ def _meeting_summary_line(content_summary: str, meeting_title: str) -> str:
     return f"בקשה לתאם שיחה קצרה בנושא {topic} ולשלוח אישור חזרה."
 
 
+def _attachment_summary_line(email_context: dict[str, str]) -> str:
+    if email_context.get("attachments_verified") != "yes":
+        return ""
+    names = (email_context.get("attachment_names") or "").strip()
+    if not names or names == "None":
+        return "📎 קבצים מצורפים: קיים קובץ מצורף מאומת"
+    return f"📎 קבצים מצורפים: {names}"
+
+
+def _reply_possible_from_context(email_context: dict[str, str]) -> bool:
+    return email_context.get("reply_possible") == "yes"
+
+
+def _sender_type_from_context(email_context: dict[str, str]) -> str:
+    return (email_context.get("sender_type") or "").strip().lower()
+
+
+def _looks_like_low_value_notification(messages: list[BaseMessage]) -> bool:
+    email_context = _extract_email_context_from_messages(messages)
+    sender_type = _sender_type_from_context(email_context)
+    if sender_type != "no-reply":
+        return False
+
+    haystack = f"{email_context.get('subject', '')} {email_context.get('content', '')}".lower()
+    low_value_markers = [
+        "linkedin",
+        "notification",
+        "posted:",
+        "product update",
+        "newsletter",
+        "marketing",
+        "office hours",
+        "unsubscribe",
+        "view in browser",
+        "base44",
+        "ludeo",
+    ]
+    return any(marker in haystack for marker in low_value_markers)
+
+
 def _extract_translation_block(ai_text: str) -> str:
     text = (ai_text or "").strip()
     if not text:
@@ -477,6 +538,114 @@ def _looks_like_residual_action_card(text: str) -> bool:
         "מועד מבוקש",
     ]
     return any(token in normalized for token in card_tokens)
+
+
+def _extract_meeting_explanation(ai_text: str) -> str:
+    cleaned = _strip_internal_approval_sections_safe(ai_text)
+    if not cleaned:
+        return ""
+
+    explanation_lines: list[str] = []
+    for raw_line in cleaned.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("[[BUTTONS:"):
+            continue
+        if any(
+            token in line
+            for token in [
+                "טיוטת מענה",
+                "תרגום לעברית",
+                "הצעה לפעולה",
+                "מועד מבוקש",
+                "שולח:",
+                "מאת:",
+                "📅",
+                "📧",
+                "✍️",
+                "📌",
+                "👤",
+                "⏰",
+                "📆",
+                "💡",
+            ]
+        ):
+            continue
+        explanation_lines.append(line)
+
+    if not explanation_lines:
+        return ""
+    return "\n".join(explanation_lines[:3])
+
+
+def _extract_summary_from_recent_ai_messages(messages: list[BaseMessage]) -> str:
+    for msg in reversed(messages):
+        if not isinstance(msg, AIMessage):
+            continue
+        text = _strip_internal_approval_sections_safe(extract_text(msg.content))
+        if not text:
+            continue
+        match = re.search(r"^📌\s*(.+)$", text, re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def _looks_broken_summary(text: str) -> bool:
+    normalized = (text or "").strip()
+    if not normalized:
+        return True
+    return normalized.count("?") >= 6 or normalized.count("�") >= 2
+
+
+def _render_meeting_approval_card(
+    *,
+    email_context: dict[str, str],
+    meeting_title: str,
+    when_label: str,
+    meeting_summary: str,
+    agenda_start_time: str | None,
+    draft_text: str = "",
+    draft_language: str = "",
+    translation_block: str = "",
+    action_suggestion: str,
+    explanation_text: str = "",
+) -> str:
+    compact_lines = [
+        f"📅 {meeting_title}",
+        f"👤 שולח: {_format_sender_for_card(email_context.get('sender', ''))}",
+    ]
+    if when_label and when_label != "לא צוין":
+        compact_lines.append(f"⏰ מועד מבוקש: {when_label}")
+    compact_lines.extend(
+        [
+            f"📌 {meeting_summary}",
+        ]
+    )
+    if explanation_text:
+        compact_lines.extend(["", explanation_text])
+    if draft_text:
+        compact_lines.extend(
+            [
+                "",
+                f"✍️ טיוטת מענה ({draft_language or _detect_draft_language(draft_text)}):",
+                draft_text,
+            ]
+        )
+        if (draft_language or _detect_draft_language(draft_text)) != "עברית":
+            compact_lines.extend(
+                [
+                    "",
+                    "תרגום לעברית:",
+                    translation_block or "התרגום לעברית לא סופק אוטומטית בטיוטה הזו עדיין.",
+                ]
+            )
+    compact_lines.extend(["", f"💡 הצעה לפעולה: {action_suggestion}"])
+    agenda_block = _render_daily_agenda_for_card(agenda_start_time)
+    if agenda_block:
+        compact_lines.extend(["", agenda_block])
+    return "\n".join(compact_lines)
 
 
 def _extract_success_message_from_state(messages: list[BaseMessage]) -> str | None:
@@ -652,6 +821,21 @@ def _create_event_is_unsolicited_for_context(tool_calls: list[dict], messages: l
     return _context_looks_like_deadline_task(messages)
 
 
+def _should_promote_meeting_draft_to_unified_approval(
+    tool_calls: list[dict],
+    messages: list[BaseMessage],
+    ai_text: str,
+) -> bool:
+    tool_names = {tc.get("name") for tc in tool_calls if tc.get("name")}
+    if not tool_names:
+        return False
+    if not tool_names.issubset({"create_draft", "send_email"}):
+        return False
+    if not _context_looks_like_meeting(messages):
+        return False
+    return True
+
+
 def _last_pending_ai_with_tools(messages: list[BaseMessage]) -> AIMessage | None:
     return next(
         (m for m in reversed(messages) if isinstance(m, AIMessage) and getattr(m, "tool_calls", None)),
@@ -699,6 +883,8 @@ def _render_pending_approval(
     sender_name = _display_name_from_sender(email_context.get("sender", ""))
     subject = email_context.get("subject", "")
     content_summary = _summarize_text(email_context.get("content", "") or subject)
+    if _looks_broken_summary(content_summary):
+        content_summary = _extract_summary_from_recent_ai_messages(messages) or _summarize_text(subject)
     translation_block = _extract_translation_block_safe(cleaned_ai_text)
 
     send_email_call = next((tc for tc in tool_calls if tc.get("name") == "send_email"), None)
@@ -731,34 +917,18 @@ def _render_pending_approval(
                 action_suggestion = "לאשר יצירת אירוע ביומן ואת הטיוטה המוצעת"
             elif draft_call:
                 action_suggestion = "לאשר את הטיוטה ולשלוח תשובה"
-
-            compact_lines = [
-                f"📅 {meeting_title}",
-                f"👤 שולח: {_format_sender_for_card(email_context.get('sender', ''))}",
-            ]
-            if when_label and when_label != "לא צוין":
-                compact_lines.append(f"⏰ מועד מבוקש: {when_label}")
-            compact_lines.extend(
-                [
-                    f"📌 {meeting_summary}",
-                    "",
-                    f"✍️ טיוטת מענה ({draft_language}):",
-                    draft_text,
-                ]
+            return _render_meeting_approval_card(
+                email_context=email_context,
+                meeting_title=meeting_title,
+                when_label=when_label,
+                meeting_summary=meeting_summary,
+                agenda_start_time=(create_event_call or {}).get("args", {}).get("start_time"),
+                draft_text=draft_text,
+                draft_language=draft_language,
+                translation_block=translation_block,
+                action_suggestion=action_suggestion,
+                explanation_text=_extract_meeting_explanation(cleaned_ai_text),
             )
-            if draft_language != "עברית":
-                compact_lines.extend(
-                    [
-                        "",
-                        "תרגום לעברית:",
-                        translation_block or "התרגום לעברית לא סופק אוטומטית בטיוטה הזו עדיין.",
-                    ]
-                )
-            compact_lines.extend(["", f"💡 הצעה לפעולה: {action_suggestion}"])
-            agenda_block = _render_daily_agenda_for_card((create_event_call or {}).get("args", {}).get("start_time"))
-            if agenda_block:
-                compact_lines.extend(["", agenda_block])
-            return "\n".join(compact_lines)
 
         timing = email_context.get("when_hint")
         title = "דחיית בקשה" if re.search(r"(tomorrow|urgent|מחר|דחוף)", f"{subject} {content_summary}", re.IGNORECASE) else "טיוטת מענה"
@@ -766,6 +936,11 @@ def _render_pending_approval(
         lines.append(f"👤 שולח: {_format_sender_for_card(email_context.get('sender', ''))}")
         if timing:
             lines.append(f"⏰ מועד: {timing}")
+        attachment_line = _attachment_summary_line(email_context)
+        if attachment_line:
+            lines.append(attachment_line)
+        if not _reply_possible_from_context(email_context):
+            lines.append("ℹ️ אי אפשר להשיב ישירות לכתובת הזו במייל.")
         lines.extend(
             [
                 f"📌 {content_summary or subject or 'בקשה כללית לעדכון או תגובה.'}",
@@ -794,26 +969,16 @@ def _render_pending_approval(
         args = create_event_call.get("args", {})
         meeting_title = normalize_event_summary(args.get("summary", "אירוע חדש"))
         meeting_summary = _meeting_summary_line(content_summary, meeting_title)
-        compact_lines = [
-            f"📅 {meeting_title}",
-            f"👤 שולח: {_format_sender_for_card(email_context.get('sender', ''))}",
-        ]
         when_label = _format_datetime_for_user(args.get("start_time"))
-        if when_label and when_label != "לא צוין":
-            compact_lines.append(f"⏰ מועד מבוקש: {when_label}")
-        compact_lines.extend(
-            [
-                f"📌 {meeting_summary}",
-                "",
-                "💡 הצעה לפעולה: לאשר יצירת אירוע ביומן",
-                "",
-                "זיהיתי שמדובר בבקשת פגישה ולכן הכנתי אירוע ביומן עם הפרטים שמצאתי.",
-            ]
+        return _render_meeting_approval_card(
+            email_context=email_context,
+            meeting_title=meeting_title,
+            when_label=when_label,
+            meeting_summary=meeting_summary,
+            agenda_start_time=args.get("start_time"),
+            action_suggestion="לאשר יצירת אירוע ביומן",
+            explanation_text=_extract_meeting_explanation(cleaned_ai_text) or "זיהיתי שמדובר בבקשת פגישה ולכן הכנתי אירוע ביומן עם הפרטים שמצאתי.",
         )
-        agenda_block = _render_daily_agenda_for_card(args.get("start_time"))
-        if agenda_block:
-            compact_lines.extend(["", agenda_block])
-        return "\n".join(compact_lines)
 
     if update_event_call:
         args = update_event_call.get("args", {})
@@ -888,14 +1053,14 @@ def ask_brain(payload: RequestModel):
         server_logger.info(f"Using explicit thread_id from payload: {thread_id}")
     elif payload.reply_to_message_id:
         mapping_found = False
-        if state_manager.messages is not None:
-            mapping = state_manager.messages.find_one({"telegram_id": str(payload.reply_to_message_id)})
+        if workflow_state_store.messages is not None:
+            mapping = workflow_state_store.messages.find_one({"telegram_id": str(payload.reply_to_message_id)})
             if mapping:
                 thread_id = mapping.get("action_id", user_id)
                 mapping_found = True
                 server_logger.info(f"🔗 Context Match: Found action_id {thread_id} for Telegram message {payload.reply_to_message_id}")
         else:
-             thread_id_fallback = state_manager._memory_messages.get(str(payload.reply_to_message_id))
+             thread_id_fallback = workflow_state_store._memory_messages.get(str(payload.reply_to_message_id))
              if thread_id_fallback:
                  thread_id = thread_id_fallback
                  mapping_found = True
@@ -916,7 +1081,7 @@ def ask_brain(payload: RequestModel):
 
     # בדיקה האם המשתמש מספק כתובת אימייל ישירה (שמירת איש קשר)
     if "@" in user_text and " " not in user_text.strip():
-        # Heuristic - if it's just an email, let's save it to state_manager contacts for good measure.
+        # Heuristic - if it's just an email, let's save it to workflow_state_store contacts for good measure.
         # But we also just pass it to the Graph to handle.
         pass
 
@@ -1015,6 +1180,45 @@ def ask_brain(payload: RequestModel):
                     auto_resume_budget -= 1
                 post_messages = post_state.values.get("messages", [])
                 post_is_paused = bool(post_state.next and any("sensitive" in step for step in post_state.next))
+                successful_tool_names = {
+                    getattr(msg, "name", None)
+                    for msg in post_messages
+                    if isinstance(msg, ToolMessage)
+                    and (
+                        "successfully" in extract_text(msg.content).lower()
+                        or "created" in extract_text(msg.content).lower()
+                        or "sent" in extract_text(msg.content).lower()
+                    )
+                    and getattr(msg, "name", None)
+                }
+
+                if approval_requests_send and "create_draft" in successful_tool_names and "send_email" not in successful_tool_names:
+                    last_draft_ai = next(
+                        (
+                            m for m in reversed(post_messages)
+                            if isinstance(m, AIMessage)
+                            and any(tc.get("name") == "create_draft" for tc in getattr(m, "tool_calls", []) or [])
+                        ),
+                        None,
+                    )
+                    if last_draft_ai is not None:
+                        draft_call = next(
+                            (tc for tc in getattr(last_draft_ai, "tool_calls", []) if tc.get("name") == "create_draft"),
+                            None,
+                        )
+                        draft_args = (draft_call or {}).get("args", {})
+                        if draft_args.get("to_email") and draft_args.get("subject") and draft_args.get("body"):
+                            sent_id = gmail_send_email(
+                                draft_args["to_email"],
+                                draft_args["subject"],
+                                draft_args["body"],
+                                thread_id=draft_args.get("thread_id"),
+                            )
+                            if sent_id:
+                                server_logger.info("Sent approved draft immediately after create_draft fallback.")
+                                successful_tool_names.add("send_email")
+                                post_is_paused = False
+
                 final_answer = ""
                 for msg in reversed(post_messages):
                     if not isinstance(msg, AIMessage):
@@ -1027,6 +1231,28 @@ def ask_brain(payload: RequestModel):
                     success_override = _extract_success_message_from_state(post_messages)
                     if success_override:
                         final_answer = success_override
+                if approval_requests_send and "create_draft" in successful_tool_names and "send_email" in successful_tool_names:
+                    final_answer = "✅ הטיוטה אושרה והמייל נשלח בהצלחה."
+                elif approval_requests_send and "create_event" in successful_tool_names and "send_email" in successful_tool_names:
+                    create_event_ai = next(
+                        (
+                            m for m in reversed(post_messages)
+                            if isinstance(m, AIMessage)
+                            and any(tc.get("name") == "create_event" for tc in getattr(m, "tool_calls", []) or [])
+                        ),
+                        None,
+                    )
+                    create_event_call = next(
+                        (tc for tc in getattr(create_event_ai, "tool_calls", []) if tc.get("name") == "create_event"),
+                        None,
+                    ) if create_event_ai else None
+                    start_label = _format_datetime_for_user(((create_event_call or {}).get("args") or {}).get("start_time"))
+                    final_answer = "\n".join(
+                        [
+                            "✅ המייל נשלח והפגישה נוספה ליומן.",
+                            f"📅 {start_label}",
+                        ]
+                    ) if start_label != "לא צוין" else "✅ המייל נשלח והפגישה נוספה ליומן."
                 elif post_is_paused:
                     pending_ai = next(
                         (m for m in reversed(post_messages) if isinstance(m, AIMessage) and getattr(m, "tool_calls", None)),
@@ -1194,11 +1420,17 @@ def analyze_incoming_event(payload: RequestModel):
     
     import uuid
     import time
-    internal_id = state_manager.save_action(user_id, "langgraph", "incoming_email", {})
+    internal_id = workflow_state_store.save_action(user_id, "langgraph", "incoming_email", {})
     
     config = {"configurable": {"thread_id": internal_id}}
     
     enriched_text = payload.text
+    verified_sender = ""
+    verified_subject = ""
+    reply_possible = True
+    sender_type = "person"
+    attachment_names: list[str] = []
+    has_calendar_invite = False
     if payload.email_id:
         try:
             full_email = fetch_email_by_id(payload.email_id)
@@ -1209,14 +1441,25 @@ def analyze_incoming_event(payload: RequestModel):
                     body = body[:3000] + "... [Extreme Truncation]"
                 sender = full_email.get("sender") or ""
                 subject = full_email.get("subject") or ""
+                verified_sender = sender
+                verified_subject = subject
+                reply_possible = bool(full_email.get("reply_possible", True))
+                sender_type = "no-reply" if not reply_possible else "person"
+                attachment_names = [item.get("filename", "").strip() for item in full_email.get("attachments", []) if item.get("filename")]
+                has_calendar_invite = bool(full_email.get("has_calendar_invite"))
                 metadata_lines = []
                 if sender:
                     metadata_lines.append(f"From: {sender}")
                 if subject:
                     metadata_lines.append(f"Subject: {subject}")
+                metadata_lines.append(f"Reply-Possible: {'yes' if reply_possible else 'no'}")
+                metadata_lines.append(f"Sender-Type: {sender_type}")
+                metadata_lines.append(f"Attachments-Verified: {'yes' if attachment_names else 'no'}")
+                metadata_lines.append(f"Attachment-Names: {', '.join(attachment_names) if attachment_names else 'None'}")
+                metadata_lines.append(f"Has-Calendar-Invite: {'yes' if has_calendar_invite else 'no'}")
                 metadata_lines.append(f"Content: {body}")
                 enriched_text = "\n".join(metadata_lines)
-                if full_email.get("has_calendar_invite"):
+                if has_calendar_invite:
                     enriched_text += "\n\n[📅 מייל זה מכיל הזמנת יומן]"
         except Exception as e:
             server_logger.error(f"⚠️ Email enrichment failed: {e}")
@@ -1228,7 +1471,7 @@ def analyze_incoming_event(payload: RequestModel):
              email_part = re.search(r'<(.+?)>', contact_email)
              email_val = email_part.group(1) if email_part else contact_email
              name_val = contact_email.replace(f"<{email_val}>", "").strip() or email_val.split("@")[0]
-             state_manager.save_contact(user_id, name_val, email_val)
+             workflow_state_store.save_contact(user_id, name_val, email_val)
          except: pass
          
     # הזנה לגרף
@@ -1246,8 +1489,23 @@ def analyze_incoming_event(payload: RequestModel):
             status="ignored",
         )
 
-    input_text = f"[New Incoming Email from {payload.source}]\nPlease read this email and respond with a brief summary, and if action is required, prepare the necessary draft or calendar event tool calls.\n\nEmail Content:\n{enriched_text}"
+    input_text = (
+        f"[New Incoming Email from {payload.source}]\n"
+        "First classify the email into exactly one type: MEETING, TASK, REPLY, CRITICAL, or IGNORE.\n"
+        "Only then decide whether it should reach Telegram.\n"
+        "Use only verified metadata for attachments, replyability, and calendar-invite detection.\n\n"
+        f"Email Content:\n{enriched_text}"
+    )
     user_input_msg = HumanMessage(content=input_text)
+
+    if _looks_like_low_value_notification([user_input_msg]):
+        server_logger.info(f"Skipping low-value no-reply notification (thread: {internal_id}).")
+        return _build_response(
+            answer="מייל סווג כעדכון low-value ולא נשלח לטלגרם.",
+            internal_id=internal_id,
+            is_paused=False,
+            status="ignored",
+        )
     
     final_output = ""
     last_aimsg = None
@@ -1307,6 +1565,80 @@ def analyze_incoming_event(payload: RequestModel):
                         last_aimsg = msg
                         final_output = extract_text(msg.content)
 
+    if last_aimsg and last_aimsg.tool_calls:
+        pending_tool_names = {tc.get("name") for tc in last_aimsg.tool_calls if tc.get("name")}
+        should_block_unreplyable_draft = (
+            pending_tool_names.intersection({"create_draft", "send_email"})
+            and not _reply_possible_from_context(_extract_email_context_from_messages([user_input_msg]))
+        )
+        if should_block_unreplyable_draft:
+            server_logger.info(
+                f"Blocking draft/send for non-replyable email (thread: {internal_id})."
+            )
+            graph.update_state(
+                config,
+                {
+                    "messages": [
+                        ToolMessage(
+                            tool_call_id=tc["id"],
+                            content=(
+                                "This email is not replyable via email. Do NOT create a draft and do NOT send an email. "
+                                "Either ignore it or summarize it without reply actions."
+                            ),
+                            name=tc["name"],
+                            status="error",
+                        )
+                        for tc in last_aimsg.tool_calls
+                        if tc.get("name") in {"create_draft", "send_email"}
+                    ]
+                },
+            )
+            final_output = ""
+            last_aimsg = None
+            for event in graph.stream(None, config, stream_mode="values"):
+                if "messages" in event:
+                    msg = event["messages"][-1]
+                    if isinstance(msg, AIMessage):
+                        last_aimsg = msg
+                        final_output = extract_text(msg.content)
+
+    if last_aimsg and last_aimsg.tool_calls and _should_promote_meeting_draft_to_unified_approval(
+        last_aimsg.tool_calls,
+        [user_input_msg],
+        final_output,
+    ):
+        server_logger.info(
+            f"Promoting meeting draft-only pause into a unified scheduling approval card (thread: {internal_id})."
+        )
+        graph.update_state(
+            config,
+            {
+                "messages": [
+                    ToolMessage(
+                        tool_call_id=tc["id"],
+                        content=(
+                            "Do not stop on a draft-only approval for this meeting email. "
+                            "Build one unified approval card for the user that includes the meeting context, "
+                            "any calendar conflict or alternate slot, the proposed draft reply, and the rest of the agenda for the requested day. "
+                            "Pause only on that unified action card, not on an intermediate draft-only step."
+                        ),
+                        name=tc["name"],
+                        status="error",
+                    )
+                    for tc in last_aimsg.tool_calls
+                    if tc.get("name") in {"create_draft", "send_email"}
+                ]
+            },
+        )
+        final_output = ""
+        last_aimsg = None
+        for event in graph.stream(None, config, stream_mode="values"):
+            if "messages" in event:
+                msg = event["messages"][-1]
+                if isinstance(msg, AIMessage):
+                    last_aimsg = msg
+                    final_output = extract_text(msg.content)
+
     # 🚫 Early exit for SPAM/TRASH
     if "[IGNORE_EMAIL]" in final_output:
         server_logger.info(f"🚮 Email classified as SPAM/TRASH. Silent mode active. Thread: {internal_id}")
@@ -1358,3 +1690,5 @@ def execute_task(payload: ExecutionRequest):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+

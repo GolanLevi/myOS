@@ -6,13 +6,13 @@ This document describes the current runtime architecture of `myOS` as reflected 
 
 ## Runtime Components
 
-- `server.py`
+- `manager_api.py`
   The main FastAPI application. It exposes the public API, initializes LangGraph, and coordinates the approval flow.
 
 - `main.py`
   Starts FastAPI and the native Telegram bot in the same Python process.
 
-- `agents/langgraph_agent.py`
+- `agents/secretariat_graph.py`
   Builds the LangGraph graph, defines tool access, separates safe tools from sensitive tools, and manages LLM-provider fallback.
 
 - `bot/telegram_bot.py`

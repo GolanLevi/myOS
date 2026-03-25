@@ -2,7 +2,7 @@ import base64
 import re
 import io
 from email.mime.text import MIMEText
-from email.header import Header
+from email.header import Header, decode_header, make_header
 from utils.gmail_connector import get_gmail_service
 
 try:
@@ -25,6 +25,40 @@ try:
 except ImportError:
     HAS_DOCX = False
     print("python-docx not installed - DOCX attachments will not be readable")
+
+
+def _extract_email_address(raw_value):
+    match = re.search(r"<([^>]+)>", raw_value or "")
+    if match:
+        return match.group(1).strip().lower()
+    if "@" in (raw_value or ""):
+        return raw_value.strip().strip('"').lower()
+    return ""
+
+
+def _extract_display_name(raw_value):
+    raw_value = (raw_value or "").strip()
+    if not raw_value:
+        return ""
+    match = re.search(r"<([^>]+)>", raw_value)
+    if match:
+        return raw_value.replace(match.group(0), "").strip().strip('"')
+    return raw_value.split("@")[0].strip().strip('"')
+
+
+def _is_no_reply_address(email_value):
+    email_value = (email_value or "").lower()
+    return any(token in email_value for token in ["noreply", "no-reply", "notifications", "do-not-reply", "donotreply"])
+
+
+def _decode_header_value(raw_value):
+    value = (raw_value or "").strip()
+    if not value:
+        return ""
+    try:
+        return str(make_header(decode_header(value)))
+    except Exception:
+        return value
 
 
 def _extract_body_from_parts(parts, mime_type="text/plain"):
@@ -213,9 +247,17 @@ def fetch_email_by_id(msg_id):
         msg_data = service.users().messages().get(userId='me', id=msg_id, format='full').execute()
         
         headers = msg_data.get("payload", {}).get("headers", [])
-        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
-        sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown")
-        date = next((h['value'] for h in headers if h['name'] == 'Date'), "")
+        subject = _decode_header_value(next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject"))
+        sender = _decode_header_value(next((h['value'] for h in headers if h['name'] == 'From'), "Unknown"))
+        reply_to = _decode_header_value(next((h['value'] for h in headers if h['name'] == 'Reply-To'), ""))
+        to_value = _decode_header_value(next((h['value'] for h in headers if h['name'] == 'To'), ""))
+        date = _decode_header_value(next((h['value'] for h in headers if h['name'] == 'Date'), ""))
+        thread_id = msg_data.get("threadId", "")
+        sender_email = _extract_email_address(sender)
+        sender_name = _extract_display_name(sender)
+        reply_to_email = _extract_email_address(reply_to)
+        effective_reply_email = reply_to_email or sender_email
+        reply_possible = bool(effective_reply_email) and not _is_no_reply_address(effective_reply_email)
         
         # גוף מלא
         full_body = get_full_email_body(msg_data)
@@ -231,7 +273,15 @@ def fetch_email_by_id(msg_id):
         
         result = {
             "id": msg_id,
+            "threadId": thread_id,
             "sender": sender,
+            "sender_name": sender_name,
+            "sender_email": sender_email,
+            "reply_to": reply_to,
+            "reply_to_email": reply_to_email,
+            "effective_reply_email": effective_reply_email,
+            "reply_possible": reply_possible,
+            "recipient": to_value,
             "subject": subject,
             "date": date,
             "body": full_body,

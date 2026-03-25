@@ -13,11 +13,11 @@ load_dotenv()
 
 from utils.calendar_tools_lc import calendar_tools
 from utils.gmail_tools_lc import gmail_tools
-from agents.information_agent import InformationAgent
+from agents.information_agent import KnowledgeAgent
 from utils.logger import agent_logger
 
-# State Definition
-class AgentState(TypedDict):
+# State Definition for the secretariat workflow graph
+class SecretariatGraphState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     user_id: str
 
@@ -158,7 +158,7 @@ def invoke_with_fallback(messages: list[BaseMessage]):
     raise RuntimeError("No LLM provider succeeded.")
 
 # Initialize RAG for manual routing (Optional, we can also expose RAG as a tool later)
-rag_agent = InformationAgent()
+knowledge_agent = KnowledgeAgent()
 
 # Context Prompt
 SYSTEM_PROMPT = """ROLE: myOS Secretariat
@@ -200,6 +200,24 @@ SUCCESS & STOP: After an action executes, confirm briefly and STOP.
 PARALLEL EXECUTION: Call multiple safe tools (search + calendar) in the same turn.
 LEAN SEARCH: Fetch full email body only when needed (use fetch_recent_emails first for metadata).
 
+EMAIL TRIAGE CONTRACT:
+- MEETING: real synchronous interaction only (meeting, call, live interview, reschedule, calendar invite).
+- TASK: deadline, submission, one-way interview, assessment, verification, documents, invoices, receipts, uploads.
+- REPLY: the main value is drafting a response.
+- CRITICAL: important update that materially changes the user's next step.
+- IGNORE: marketing, newsletter, LinkedIn-style notification, passive no-reply update, low-value automation.
+
+DELIVERY RULES:
+- Telegram is a decision UI, not an inbox mirror.
+- Do not send low-value no-reply notifications to Telegram.
+- Do not draft replies for non-replyable emails.
+- Never paste the full email body to the user. Summarize only.
+
+VERIFICATION RULES:
+- Use only verified metadata for attachment presence.
+- If no attachment is verified, never claim that a file/CV/document is attached.
+- If a date or time is not explicitly in the email, say it is not specified. Never guess.
+
 ═══════════════════════════════════════════
 3. LANGUAGE & DRAFTS
 ═══════════════════════════════════════════
@@ -215,6 +233,7 @@ PRIVACY STRICTNESS: Never mention the user's classes, gym, commute, personal rou
 4. SCHEDULING INTELLIGENCE
 ═══════════════════════════════════════════
 SEARCH FIRST: If entity/email is unknown → use search_emails or search_contacts.
+EMAIL METADATA: When deciding whether reply or attachment claims are valid, use verified email metadata or inspect_email_artifacts. Do not infer.
 FREE SLOTS: Before suggesting meeting times → call get_free_slots(date). Never ask "when are you free?".
 BUFFERS: 45 min after events; 30 min before fixed activities (gym/class).
 URGENCY: Mark [דחוף] ONLY for same-day cancellations or last-minute changes.
@@ -245,12 +264,15 @@ A. Meeting / Calendar invite:
 
 💡 הצעה לפעולה: [מה בדיוק יאושר]
 [משפט הסבר קצר אם צריך]
+[📆 המשך הלוז לאותו היום, אם יש תאריך מבוקש]
 [[BUTTONS: אשר וסנכרן ליומן | דחה בנימוס | אתן הכוונה]]
 
 B. Task / General:
 [Emoji] [כותרת]
 👤 שולח: [שם/שולח אם רלוונטי]
 [⏰ מועד / דדליין אם רלוונטי]
+[📎 קבצים מצורפים מאומתים, אם קיימים]
+[ℹ️ אם אי אפשר להשיב ישירות במייל, לציין זאת]
 📌 [פרטים קצרים]
 
 ✍️ טיוטת מענה ([שפת המקור]) או פעולה מוצעת:
@@ -381,7 +403,7 @@ safe_tools_node = ToolNode(safe_tools)
 sensitive_tools_node = ToolNode(sensitive_tools)
 
 # Build the Graph
-workflow = StateGraph(AgentState)
+workflow = StateGraph(SecretariatGraphState)
 
 workflow.add_node("agent", agent_node)
 workflow.add_node("safe_tools", safe_tools_node)
@@ -396,10 +418,16 @@ workflow.add_edge("sensitive_tools", "agent")
 
 # Compile with Checkpointer (Memory) and Breakpoint (HITL)
 # We will use MongoDBSaver in the main app, for now we will just return the compiled graph
-def build_graph(checkpointer=None):
+def build_secretariat_graph(checkpointer=None):
     if checkpointer:
         return workflow.compile(
             checkpointer=checkpointer,
             interrupt_before=["sensitive_tools"]
         )
     return workflow.compile()
+
+
+# Backward-compatible alias during the naming transition.
+AgentState = SecretariatGraphState
+build_graph = build_secretariat_graph
+
