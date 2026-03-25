@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🧠 myOS — AI-Powered Personal Operating System
+# 🧠 myOS — My Personal AI Operating System
 
-> A self-hosted AI agent orchestration system that connects your Gmail, Google Calendar, and Telegram into one intelligent, privacy-first workflow.
+> I was drowning in emails and context-switching, so I built a self-hosted, LangGraph-powered AI agent to orchestrate my digital life (Gmail, Calendar, Telegram) — with extreme privacy and a strict Human-in-the-Loop design.
 
 [🇮🇱 לקריאה בעברית](README_HE.md)
 
@@ -10,195 +10,172 @@
 
 ---
 
-## 📌 What is myOS?
+## 📌 Why I Built This
 
-I started building myOS because I was drowning in emails, missing meetings, and constantly context-switching between apps. Instead of looking for another productivity tool, I decided to build one from scratch — one that actually understands context, remembers history, and never does anything sensitive without my explicit approval.
+Hi! 👋 I'm a passionate junior developer obsessed with Generative AI and building real-world software. I started building **myOS** because I was tired of generic "productivity apps." I didn't want another dashboard — I wanted a *digital twin*. Someone (or something) that understands my context, remembers my history, checks my calendar before I even ask, but **never does anything sensitive without my explicit permission.**
 
-The core principle is simple:
-- The AI **analyzes, drafts, and proposes** actions.
-- **Sensitive actions pause** and wait for my explicit approval via Telegram.
-- All data and credentials stay on **my own machine**.
-
----
-
-## ✅ What It Currently Does
-
-| Capability | Description |
-|---|---|
-| 📧 Email Triage | Classifies incoming emails — spam is auto-handled, everything else gets a structured card |
-| ✍️ Reply Drafting | Drafts context-aware replies in Hebrew or English before sending anything |
-| 📅 Meeting Scheduling | Checks calendar availability, proposes meeting times, and creates events after approval |
-| 🔄 Approval Flow | Sends Telegram cards with inline buttons — approve, decline, or provide manual instructions |
-| 🧠 Long-term Memory | Stores and retrieves context using vector search (ChromaDB + RAG) |
-| 🔒 Human-in-the-Loop | Sensitive tools (send email, create/delete event) are **always gated behind approval** |
+The core philosophy of this project is simple:
+- The AI does the heavy lifting: **analyzing, drafting, and proposing.**
+- **Sensitive actions** (like sending an email or booking a calendar event) pause and wait for my approval via a native Telegram bot.
+- All data, credentials, and states live locally on my machine. No third-party wrappers, just raw APIs and intelligent agents.
 
 ---
 
-## 🏗️ Architecture
+## 🛠️ The Craftsmanship: How It Was Built
 
-The system is built around a **LangGraph Stateful Cyclic Graph** — the agent repeatedly reasons, calls tools, and routes back until it either completes a safe action or pauses at a human-approval breakpoint.
+Building a system like this is complex. Transitioning from a linear script to a **Stateful Cyclic Graph** required a lot of trial and error. To move fast and learn deeply, I actively collaborated with advanced AI coding assistants — specifically **Codex** and **Antigravity**. 
+
+Using these tools as pair-programmers allowed me to rapidly prototype the LangGraph architecture, refine the custom tool bindings (so Gemini knows exactly what Gmail functions it can use), and debug nasty infinite loops in the agent's logic. It was an incredible journey of learning how to orchestrate AI *using* AI.
+
+---
+
+## 📬 The Journey of an Email (3 Real Scenarios)
+
+To really understand what this system does, here is exactly what happens when different types of emails hit the server via the n8n webhook:
+
+### Scenario 1: The Magic of Scheduling (Meeting Request)
+*Someone wants to meet with me next week.*
+1. **Context Extraction:** The LangGraph agent reads the email and understands the intent.
+2. **Tool Execution (Safe):** The agent autonomously calls the `get_free_slots` tool to check my actual Google Calendar against the requested time.
+3. **Drafting:** The agent writes a polite response in the sender's language, offering the available times.
+4. **The Breakpoint (HITL):** Since sending an email is a "sensitive tool," the graph *freezes*. It fires a beautiful summary card to my Telegram.
+5. **Approval:** I tap the "Approve & Sync" inline button in Telegram.
+6. **Execution:** The graph resumes, fires the `send_email` and `create_event` tools, and boom — it's in my calendar.
+
+> ⬇️ **Demo: The typical meeting approval flow**
+> 
+> *[Placeholder: Add image `demo_meeting_flow.png` here showing the Telegram bot interface proposing times and the final calendar sync]*
+
+### Scenario 2: Emergency Alert! (High Priority)
+*An urgent alert from a monitoring system or a critical update from a boss.*
+1. **Classification:** The agent scans the incoming email and its neural network flags the urgency markers ("Urgent", "Action Required").
+2. **Bypassing the Queue:** The agent realizes this isn't something to just draft and wait on.
+3. **Immediate Ping:** It immediately routes a high-priority alert directly to my Telegram with a concise summary of the crisis, so I know exactly what needs my attention without opening the Gmail app.
+
+> ⬇️ **Demo: Handling an urgent alert**
+> 
+> *[Placeholder: Add image `demo_urgent_alert.png` here showing a red/urgent Telegram card]*
+
+### Scenario 3: The Silent Guardian (Spam & Marketing)
+*A random marketing newsletter or cold sales outreach.*
+1. **Classification:** The agent reads the email, spots the marketing language, and classifies it as low-value/spam.
+2. **Silent Execution:** Because moving to trash is considered an auto-executable "safe" action for marketing emails, the agent calls the `trash_email` tool immediately.
+3. **No Distraction:** The graph ends. I never get a notification. My phone never buzzes. Pure focus.
+
+> ⬇️ **Demo: Taming the spam folder**
+> 
+> *[Placeholder: Add image `demo_spam.png` here showing the terminal logs of an email being identified and trashed without human intervention]*
+
+---
+
+## 🏗️ Architecture Under the Hood
+
+The brain of the operation lives in `secretariat_graph.py` and is served by `manager_api.py`. It uses a **LangGraph Stateful Cyclic Graph** — meaning the agent repeatedly reasons, calls tools, and routes back to itself until it reaches a conclusion or a predefined breakpoint.
 
 ```mermaid
 graph TD
-    Gmail["📧 Gmail\n(via n8n)"] -->|POST /analyze_email| API
-    Telegram["💬 Telegram Bot\n(Native)"] <-->|POST /ask| API
-
-    subgraph API["⚡ FastAPI Server"]
-        Router["Request Router\n+ Approval Logic"]
-    end
-
-    API --> Graph
-
-    subgraph Graph["🔁 LangGraph Orchestration"]
-        Agent["🤖 Agent Node\n(Gemini Flash)"]
-        SafeTools["✅ Safe Tools\nread_email · search_contacts\nget_free_slots · get_events"]
-        SensitiveTools["⛔ Sensitive Tools\nsend_email · create_event\nupdate_event · delete_event · trash_email"]
-
-        Agent -->|"route_tools()"| SafeTools
-        Agent -->|"route_tools()"| SensitiveTools
-        SafeTools --> Agent
-        SensitiveTools -.->|"BREAKPOINT\n(awaits approval)"| Agent
-    end
-
-    Graph --> MongoDB["🗄️ MongoDB\nCheckpoints & State"]
-    Graph --> ChromaDB["🧠 ChromaDB\nLong-term RAG Memory"]
-    Graph --> GmailAPI["📬 Gmail API"]
-    Graph --> CalendarAPI["📅 Google Calendar API"]
-```
-
-### How the HITL Flow Works
-
-```mermaid
-graph TD
-    A["📧 Email Arrives\n(via n8n webhook)"] --> B["⚡ FastAPI\n(/analyze_email)"]
-    B --> C{"🤖 LangGraph Agent\nAnalyzes Context"}
+    A["📧 Email Arrives\n(n8n webhook)"] --> B["⚡ FastAPI\n(/analyze_email)"]
+    B --> C{"🤖 LangGraph Agent\n(Gemini Flash)"}
     
-    C -->|"Safe Action\n(e.g., Spam)"| D("✅ Auto-execute\n(Trash/Filter)")
+    C -->|"Safe Action\n(read_email, get_slots)"| D("🔁 Loops back to Agent")
     
-    C -->|"Sensitive Action\n(e.g., Reply/Meet)"| E["⛔ BREAKPOINT\nGraph Pauses"]
+    C -->|"Sensitive Action\n(send_email, create_event)"| E["⛔ BREAKPOINT\nGraph Freezes"]
     
-    E --> F["💬 Telegram Card Sent\nShows: Draft, Times, Agenda"]
+    E --> F["💬 Native Telegram Bot\nFires Card with Inline Buttons"]
     
-    F --> G{"👤 User Action\n(Inline Buttons)"}
+    F --> G{"👤 My Decision"}
     
-    G -->|"Approve"| H["▶️ Graph Resumes"]
+    G -->|"Approve"| H["▶️ Graph Resumes State"]
     G -->|"Decline"| I("❌ Graph Drops Action")
-    G -->|"Manual Override"| J["✍️ Agent Generates\nNew Draft"]
+    G -->|"Manual Override"| J["✍️ Agent Generates New Draft"]
     
-    H --> K("✅ Tool Executes\n(Email Sent / Event Created)")
+    H --> K("✅ Tool Executes & Completes")
     J --> E
+    
+    M[("🗄️ MongoDB\nState Checkpoints")] -. "Persists Graph State" .- C
+    N[("🧠 ChromaDB\nLong-term Vector Memory")] -. "RAG Queries" .- C
 ```
 
----
-
-## 🛠️ Stack
+### The Stack I Used
 
 | Layer | Technology |
 |---|---|
-| **Orchestration** | LangGraph (Stateful Cyclic Graph + Breakpoints) |
-| **LLM** | Google Gemini Flash (`gemini-flash-latest`) |
-| **API** | FastAPI + Uvicorn |
-| **Memory** | ChromaDB (RAG) + MongoDB (LangGraph checkpoints) |
-| **Integrations** | Gmail API · Google Calendar API · Telegram Bot API |
-| **Ingestion** | n8n (email webhook trigger) |
-| **Infrastructure** | Docker Compose |
-| **Language** | Python 3.11 |
+| **Orchestration** | LangGraph (Stateful Cyclic Graphs & Breakpoints) |
+| **LLM** | Google Gemini SDK (`gemini-flash-latest`) |
+| **Backend API** | FastAPI + Uvicorn |
+| **Databases** | ChromaDB (RAG Memory) + MongoDB (Graph Checkpointers) |
+| **Integrations** | Google Workspace APIs (Gmail, Calendar) · Telegram Bot API |
+| **Ingestion** | n8n (Webhook trigger layer) |
+| **Language & Env** | Python 3.11 · Docker Compose |
 
 ---
 
 ## 🗂️ Project Structure
 
-```
+```text
 myOS/
 ├── agents/
-│   ├── langgraph_agent.py     # Core LangGraph graph, tool routing, HITL breakpoint
-│   ├── information_agent.py   # RAG agent (ChromaDB memory)
-│   └── finance_agent.py       # Invoice & payment detection (in progress)
+│   ├── secretariat_graph.py   # The core LangGraph state machine & HITL logic
+│   ├── information_agent.py   # RAG agent attached to ChromaDB
+│   └── finance_agent.py       # Invoice parsing (in progress)
 │
 ├── bot/
-│   ├── telegram_bot.py        # Native Telegram bot, inline keyboard handling
-│   └── message_formatter.py   # Approval card rendering for Telegram
-│
-├── core/
-│   ├── protocols.py           # ActionProposal schema and safety classification
-│   └── state_manager.py       # Contact management, Telegram ID mapping
+│   ├── telegram_bot.py        # Native Telegram integration and keyboard rendering
+│   └── message_formatter.py   # Beautiful layout generator for approval cards
 │
 ├── utils/
-│   ├── gmail_tools_lc.py      # Gmail tools (LangChain ToolNode compatible)
-│   ├── calendar_tools_lc.py   # Calendar tools (LangChain ToolNode compatible)
-│   └── logger.py              # Structured logging
+│   ├── gmail_tools_lc.py      # LangChain-compatible tools for Gmail API
+│   ├── calendar_tools_lc.py   # LangChain-compatible tools for Google Calendar
+│   └── logger.py              # Structured and colored terminal logging
 │
-├── server.py                  # FastAPI entry point, approval logic, graph invocation
-├── main.py                    # Runs FastAPI + Telegram polling concurrently
-├── docker-compose.yml         # Full local stack (FastAPI, MongoDB, ChromaDB, n8n)
-└── user_config.json           # Configurable scheduling rules and preferences
+├── manager_api.py             # Main FastAPI server and route controllers
+├── main.py                    # Thread runner for API + Telegram Polling
+└── docker-compose.yml         # Container orchestration (FastAPI, Mongo, Chroma)
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
+If you're brave enough to run your own OS:
+
+### 1. Prerequisites
 - Python 3.11+
 - Docker & Docker Compose
-- Google Cloud project with Gmail + Calendar APIs enabled
-- Telegram Bot token ([@BotFather](https://t.me/BotFather))
-- Google Gemini API key
+- Google Cloud project (Gmail + Calendar APIs enabled)
+- Telegram Bot token (`@BotFather`)
 
-### 1. Clone the Repository
+### 2. Setup
 ```bash
 git clone https://github.com/GolanLevi/myOS.git
 cd myOS
+cp .env.example .env # And inject your API keys here
 ```
 
-### 2. Configure Environment
+### 3. Google Auth
 ```bash
-cp .env.example .env
-# Edit .env with your API keys and tokens
+python auth_setup.py # Follow the browser prompt to generate token.json
 ```
 
-### 3. Authorize Google Access
-```bash
-python auth_setup.py
-```
-
-### 4. Run with Docker Compose
+### 4. Run the Engine
 ```bash
 docker-compose up
 ```
 
-### 5. Run Locally (Without Docker)
-```bash
-pip install -r requirements.txt
-python main.py
-```
+---
+
+## 🔐 Privacy & Security Built-in
+
+I built this for my own life, so security was paramount:
+- **No Remote Storage:** Keys, `.env`, and `token.json` never leave the machine. MongoDB runs locally.
+- **Fail-Safe Approvals:** Every tool that mutates data (sending, deleting, creating) is hardcoded into a LangGraph `interrupt_before` array. The AI *cannot* act without physical button presses.
+- **Calendar Masking:** When drafting emails, the AI is prompted to expose only raw availability slots, carefully masking private event names.
 
 ---
 
-## 🔐 Security Notes
+## 📄 License & Contact
 
-- API keys and secrets are stored in local `.env`, `credentials.json`, and `token.json` files — never committed.
-- Sensitive actions (send email, create/delete events) require explicit approval before execution.
-- Calendar replies expose only availability windows — private event details are never included.
-- All graph state is persisted to local MongoDB only.
+This is an open-ended personal project under the MIT License. Feel free to fork it, break it, and build your own digital twin.
 
----
-
-## 🗺️ Roadmap
-
-- [ ] Finance workflow: from invoice detection to review-ready payment summaries
-- [ ] Lightweight dashboard for real-time state and memory inspection
-- [ ] WhatsApp integration (via WAHA)
-- [ ] Improved test coverage for LangGraph routing and tool interception
-
----
-
-## 📄 License
-
-MIT — see [LICENSE](LICENSE)
-
----
-
-## 👤 Author
-
-**Golan Levi** — [github.com/GolanLevi](https://github.com/GolanLevi)
+**Golan Levi** 
+[github.com/GolanLevi](https://github.com/GolanLevi)
