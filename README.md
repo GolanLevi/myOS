@@ -2,6 +2,8 @@
 
 # 🧠 myOS — Personal Agent Orchestration System
 
+![Views](https://komarev.com/ghpvc/?username=GolanLevi-myOS&label=Project%20Views&color=0e75b6&style=flat)
+
 **The Problem:** Manual digital management and context-switching drain cognitive energy.  
 **The Solution:** A LangGraph-powered orchestration layer that centralizes Gmail, Calendar, and Telegram into a single intelligent infrastructure, ensuring 100% privacy and human oversight.
 

@@ -2,6 +2,8 @@
 
 # 🧠 myOS — Personal Agent Orchestration System
 
+![Views](https://komarev.com/ghpvc/?username=GolanLevi-myOS&label=Project%20Views&color=0e75b6&style=flat)
+
 **הבעיה:** ניהול זמן ותכתובות דיגיטליות גוזל משאבים קוגניטיביים יקרים.  
 **הפתרון:** שכבת ניהול (Orchestration) מבוססת LangGraph, שמרכזת את כל הפעולות (Gmail, Calendar, Telegram) תחת תשתית אחת חכמה, תוך שמירה על פרטיות מקסימלית ובקרת אנוש.
 
