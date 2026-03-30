@@ -246,7 +246,7 @@ GOLDEN WINDOWS: Prefer slots that preserve buffers, avoid back-to-back meetings 
 5. FORMATTING
 ═══════════════════════════════════════════
 DATES: "יום [שם יום], DD.MM.YYYY בשעה HH:MM"
-SUMMARIES: Always compress the email/request into 1-2 short sentences. Never paste the full email body or raw "From/Subject/Content" metadata into the user-facing summary.
+SUMMARIES: Always paraphrase the email in 1-2 of YOUR OWN concise sentences in HEBREW. Never copy-paste from the original email body. The goal is a short, readable summary that captures the essence.
 
 BUTTONS: Every response requiring action MUST end with:
 [[BUTTONS: Option A | Option B | אתן הכוונה]]
@@ -260,7 +260,7 @@ A. Meeting / Calendar invite:
 📅 [מטרת הפגישה - עם מי הפגישה]
 👤 שולח: [שם/שולח]
 ⏰ מועד מבוקש: [תאריך אנושי]
-📌 [סיכום קצר מאוד: עד 1-2 משפטים, בלי להעתיק את כל המייל]
+📌 סיכום: [סכם את הבקשה ב-1-2 משפטים **במילותיך** – אל תעתיק מגוף המייל]
 
 💡 הצעה לפעולה: [מה בדיוק יאושר]
 [משפט הסבר קצר אם צריך]
@@ -273,9 +273,9 @@ B. Task / General:
 [⏰ מועד / דדליין אם רלוונטי]
 [📎 קבצים מצורפים מאומתים, אם קיימים]
 [ℹ️ אם אי אפשר להשיב ישירות במייל, לציין זאת]
-📌 [פרטים קצרים]
+📌 סיכום: [סכם את המייל ב-1-2 משפטים קצרים **במילותיך**. אל תעתיק מגוף המייל]
 
-✍️ טיוטת מענה ([שפת המקור]) או פעולה מוצעת:
+✍️ טיוטה מוצעת ([שפת המקור]) או פעולה מוצעת:
 [תוכן]
 [תרגום לעברית אם לא בעברית]
 
@@ -310,7 +310,7 @@ trimmer = trim_messages(
     start_on="human",
 )
 
-def agent_node(state: AgentState):
+def agent_node(state: SecretariatGraphState):
     """The main LLM node that decides what to do."""
     messages = state["messages"]
     
@@ -382,7 +382,7 @@ def agent_node(state: AgentState):
     response = invoke_with_fallback(sanitized_messages)
     return {"messages": [response]}
 
-def route_tools(state: AgentState) -> Literal["safe_tools", "sensitive_tools", "__end__"]:
+def route_tools(state: SecretariatGraphState) -> Literal["safe_tools", "sensitive_tools", "__end__"]:
     """Route to safe or sensitive tools, or end if no tools called."""
     messages = state["messages"]
     last_message = messages[-1]
