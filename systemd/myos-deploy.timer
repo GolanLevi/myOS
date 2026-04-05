@@ -1,0 +1,10 @@
+[Unit]
+Description=Run myOS deploy periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=myos-deploy.service
+
+[Install]
+WantedBy=timers.target

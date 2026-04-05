@@ -1,0 +1,22 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+packages:
+  - git
+  - curl
+  - jq
+  - docker.io
+  - docker-compose-plugin
+  - python3
+  - python3-pip
+
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  - mkdir -p /opt/myos
+  - git clone --branch ${repo_branch} ${repo_url} /opt/myos || true
+  - cd /opt/myos && git fetch --all && git checkout ${repo_branch} && git pull --ff-only origin ${repo_branch} || true
+  - docker --version || true
+  - sh -c '(crontab -l 2>/dev/null; echo "${deploy_timer} cd /opt/myos && git fetch --all && git checkout ${repo_branch} && git pull --ff-only origin ${repo_branch} && docker compose up -d --build >> /var/log/myos-deploy.log 2>&1") | crontab -'
+  - cd /opt/myos && docker compose up -d --build || true

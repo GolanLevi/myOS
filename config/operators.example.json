@@ -1,0 +1,24 @@
+{
+  "operators": [
+    {
+      "username": "amit",
+      "state": "present",
+      "groups": [
+        "docker"
+      ],
+      "ssh_public_keys": [
+        "ssh-ed25519 AAAA... replace_me"
+      ]
+    },
+    {
+      "username": "golan",
+      "state": "present",
+      "groups": [
+        "docker"
+      ],
+      "ssh_public_keys": [
+        "ssh-ed25519 AAAA... replace_me"
+      ]
+    }
+  ]
+}

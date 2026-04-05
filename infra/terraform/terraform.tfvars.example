@@ -1,0 +1,28 @@
+tenancy_ocid        = "ocid1.tenancy.oc1..REPLACE_ME"
+user_ocid           = "ocid1.user.oc1..REPLACE_ME"
+fingerprint         = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+private_key_path    = "C:/Users/kapla/.oci/oci_api_key.pem"
+region              = "il-jerusalem-1"
+compartment_ocid    = "ocid1.compartment.oc1..REPLACE_ME"
+ssh_public_key_path = "C:/Users/kapla/.ssh/id_ed25519.pub"
+
+vm_display_name = "myos-agents-a1"
+
+repo_url    = "https://github.com/GolanLevi/myOS.git"
+repo_branch = "chatGPT-amit/myos-infra"
+
+deploy_timer = "*/5 * * * *"
+
+shape                     = "VM.Standard.E2.1.Micro"
+availability_domain_index = 0
+fault_domain              = null
+
+flex_ocpus         = null
+flex_memory_in_gbs = null
+
+ubuntu_version          = "24.04"
+boot_volume_size_in_gbs = 47
+data_volume_size_in_gbs = 50
+
+vcn_cidr    = "10.70.0.0/16"
+subnet_cidr = "10.70.1.0/24"

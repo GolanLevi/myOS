@@ -1,0 +1,18 @@
+{
+  "ui": {
+    "main_web_ui": true,
+    "telegram_mode": "alerts_only",
+    "pages": [
+      "home",
+      "priority_inbox",
+      "approvals",
+      "timeline",
+      "settings"
+    ]
+  },
+  "runtime": {
+    "safe_mode_default": true,
+    "approval_required_for_sensitive_actions": true,
+    "cost_tracking_enabled": true
+  }
+}
