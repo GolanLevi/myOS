@@ -64,7 +64,8 @@ COPY scripts/github_app_token.py /opt/bootstrap/github_app_token.py
 COPY scripts/on-login.sh /opt/bootstrap/on-login.sh
 COPY scripts/sanitize-env.sh /opt/bootstrap/sanitize-env.sh
 
-RUN chmod +x /opt/bootstrap/*.sh
+RUN sed -i 's/\r$//' /opt/bootstrap/*.sh /opt/bootstrap/*.py \
+ && chmod +x /opt/bootstrap/*.sh
 
 # Keep a template copy and also install it for the default dev user.
 RUN cat > /opt/bootstrap/dev.bashrc <<'EOF'
