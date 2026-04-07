@@ -2,10 +2,13 @@
 
 Use this when you want Codex to work inside an isolated container with:
 - SSH access for VS Code Remote-SSH
-- persistent `/home/dev` and `/workspace` Docker volumes
-- GitHub App auth for clone / fetch / pull / push
-- full in-container Codex autonomy by default
-- the repo AGENTS hierarchy plus optional operator-specific instructions
+- persistent home directory (`codex-home` volume)
+- persistent workspace (`codex-workspace` volume)
+- repo clone/update inside the container (no host repo bind mount)
+- GitHub App authentication for clone / fetch / pull / push
+- stripped inherited host git/token/SSH-agent credentials at runtime
+- tmux auto-resume so reconnecting over SSH returns you to the last Codex session
+- a home-level `AGENTS.md` that points Codex at the repo AGENTS hierarchy and optional user-specific instructions
 
 ## How it works
 
@@ -86,23 +89,47 @@ Then set in `.env`:
 MYOS_OPERATOR_INSTRUCTIONS=<name>
 ```
 
+### 6) Optional operator-specific instruction file
+Create a non-secret file under:
+```text
+docs/instructions/users/<name>.md
+```
+
+Then set in `.env`:
+```text
+MYOS_OPERATOR_INSTRUCTIONS=<name>
+```
+
 On login, the container home `AGENTS.md` tells Codex to load that file when it exists.
+
+### 7) Codex login
+First time only, after SSHing in:
+```bash
+codex --login
+```
+That login state persists in the `codex-home` volume.
 
 ## Quick start
 
 1. Copy `.env.example` to `.env`
 2. Edit `.env`
-3. Start:
+3. Recommended defaults for this dev box:
+```text
+CODEX_SANDBOX_MODE=danger-full-access
+CODEX_APPROVAL_POLICY=never
+```
+These make Codex run with full in-container permissions and no interactive approval prompts.
+4. Start:
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 Unblock-File .\scripts\start.ps1
 .\scripts\start.ps1
 ```
-4. Test SSH:
+5. Test SSH:
 ```powershell
 ssh -p 2222 dev@127.0.0.1
 ```
-5. In VS Code, add to `~/.ssh/config`:
+6. In VS Code, add to `~/.ssh/config`:
 ```text
 Host codex-local
     HostName 127.0.0.1
@@ -112,9 +139,9 @@ Host codex-local
     StrictHostKeyChecking no
     UserKnownHostsFile NUL
 ```
-6. VS Code -> `Remote-SSH: Connect to Host` -> `codex-local`
-7. Open `/workspace`
-8. First time only:
+7. VS Code -> `Remote-SSH: Connect to Host` -> `codex-local`
+8. Open `/workspace`
+9. In the terminal:
 ```bash
 codex --login
 ```
@@ -155,14 +182,13 @@ The image includes a fuller local toolbox so Codex can operate with less manual 
 - build tools
 - archive/network utilities
 
-## Behavior
-The container bootstraps Codex in a repo-controlled way:
+## Codex startup defaults
+The container now bootstraps Codex in a repo-controlled way so new and resumed volumes behave consistently:
 - `.bashrc` is repaired to short-circuit non-interactive shells, which keeps `ssh -T` and VS Code Remote-SSH working
 - `~/.codex/config.toml` is seeded with trusted entries for `/home/dev` and `/workspace`
 - interactive SSH logins start Codex through a wrapper script, so sandbox and approval defaults come from `.env`
 - login shells also export the GitHub App metadata from `.env`, so interactive `git fetch/pull/push` keeps using the same GitHub App path as bootstrap
 - `/home/dev/AGENTS.md` points Codex to the repo AGENTS hierarchy and optional user-specific instructions selected by `.env`
-- if repo bootstrap fails, the container still starts SSH so the box is recoverable instead of entering a restart loop
 
 The default Codex CLI startup flags are:
 ```text
@@ -178,11 +204,20 @@ CODEX_ENABLE_WEB_SEARCH=false
 MYOS_OPERATOR_INSTRUCTIONS=amit
 ```
 
+Useful examples:
+- `CODEX_APPROVAL_POLICY=on-request` if you later want Codex to pause before some commands
+- `CODEX_SANDBOX_MODE=workspace-write` if you want a safer default than full in-container access
+- `CODEX_ENABLE_WEB_SEARCH=true` if you want live web search available by default
+
+After changing these values, rerun the normal start command so the container restarts with the new behavior.
+
 ## Environment parity
 Use the same Git-managed files for both local Docker and cloud-hosted dev boxes:
 - same `infra/docker-image-codex` image build context
 - same `.env` keys and mounted GitHub App PEM
 - same named-volume style persistence goals, adapted to the target provider
 - same Codex startup wrapper and `AGENTS.md` loading model
+
+For the cloud-hosted version, use the OCI guide in [docs/OCI-DEVBOX.md](/workspace/infra/docker-image-codex/docs/OCI-DEVBOX.md). The same pattern can be applied to any cloud provider that can run Docker on a VM.
 
 For the cloud-hosted version, use the OCI guide in [docs/OCI-DEVBOX.md](/workspace/infra/docker-image-codex/docs/OCI-DEVBOX.md). The same pattern can be applied to any cloud provider that can run Docker on a VM.
