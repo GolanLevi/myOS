@@ -1,0 +1,33 @@
+services:
+  codex-box:
+    build: .
+    container_name: codex-box
+    restart: unless-stopped
+    init: true
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    ports:
+      - "${SSH_PORT:-2222}:22"
+    env_file:
+      - .env
+    environment:
+      DEV_USERNAME: ${DEV_USERNAME:-dev}
+      DEV_UID: ${DEV_UID:-1001}
+      DEV_GID: ${DEV_GID:-1001}
+      WORKSPACE_DIR: /workspace
+      CODEX_HOME: /home/${DEV_USERNAME:-dev}
+      GH_APP_PRIVATE_KEY_PATH: /run/secrets/github_app_private_key.pem
+      GIT_TERMINAL_PROMPT: "0"
+      CODEX_SANDBOX_MODE: ${CODEX_SANDBOX_MODE:-danger-full-access}
+      CODEX_APPROVAL_POLICY: ${CODEX_APPROVAL_POLICY:-never}
+      CODEX_ENABLE_WEB_SEARCH: ${CODEX_ENABLE_WEB_SEARCH:-false}
+      MYOS_OPERATOR_INSTRUCTIONS: ${MYOS_OPERATOR_INSTRUCTIONS:-}
+    volumes:
+      - codex-home:/home/${DEV_USERNAME:-dev}
+      - codex-workspace:/workspace
+      - ${GH_APP_PRIVATE_KEY_FILE:?Set GH_APP_PRIVATE_KEY_FILE in .env}:/run/secrets/github_app_private_key.pem:ro
+
+volumes:
+  codex-home:
+  codex-workspace:

@@ -1,0 +1,6 @@
+[Unit]
+Description=Reconcile myOS operator accounts
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/bin/reconcile-operators.py

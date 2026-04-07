@@ -1,0 +1,48 @@
+{
+  "organization": {
+    "name": "myOS",
+    "mission": "Preserve the working secretary core and evolve it into a controllable, approval-first AI command center."
+  },
+  "gitops": {
+    "runtime_branch": "main",
+    "deploy_strategy": "timer_pull_main",
+    "compare_url_required": true
+  },
+  "machine": {
+    "runtime_user": "myos-runtime",
+    "runtime_group": "myos-runtime",
+    "operators_group": "myos-operators",
+    "paths": {
+      "app_root": "/srv/myos-app",
+      "runtime_config_root": "/srv/myos-config",
+      "runtime_secret_root": "/run/myos-secrets",
+      "state_root": "/srv/myos-state"
+    }
+  },
+  "operators": {
+    "source_precedence": [
+      "/srv/myos-config/operators.json",
+      "/srv/myos-config/operators.local.json"
+    ],
+    "managed_groups": [
+      "docker",
+      "myos-operators"
+    ],
+    "disable_removed_users": true,
+    "never_touch_users": [
+      "root",
+      "ubuntu",
+      "myos-runtime"
+    ]
+  },
+  "deployment": {
+    "compose_file": "docker-compose.yml",
+    "service_unit_name": "myos",
+    "deploy_timer_schedule": "*/5 * * * *"
+  },
+  "vault": {
+    "secret_manifest_path": "/srv/myos-config/secret-manifest.json",
+    "runtime_file_mode": "0440",
+    "fetch_auth": "instance_principal"
+  }
+}
