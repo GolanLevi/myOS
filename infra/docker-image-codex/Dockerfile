@@ -58,12 +58,14 @@ RUN sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/s
 
 COPY scripts/entrypoint.sh /opt/bootstrap/entrypoint.sh
 COPY scripts/bootstrap_repo.sh /opt/bootstrap/bootstrap_repo.sh
+COPY scripts/start_codex.sh /opt/bootstrap/start_codex.sh
 COPY scripts/git-credential-ghapp.sh /opt/bootstrap/git-credential-ghapp.sh
 COPY scripts/github_app_token.py /opt/bootstrap/github_app_token.py
 COPY scripts/on-login.sh /opt/bootstrap/on-login.sh
 COPY scripts/sanitize-env.sh /opt/bootstrap/sanitize-env.sh
 
-RUN chmod +x /opt/bootstrap/*.sh
+RUN sed -i 's/\r$//' /opt/bootstrap/*.sh /opt/bootstrap/*.py \
+ && chmod +x /opt/bootstrap/*.sh
 
 # Keep a template copy and also install it for the default dev user.
 RUN cat > /opt/bootstrap/dev.bashrc <<'EOF'
@@ -75,9 +77,7 @@ case $- in
 esac
 
 # codex dev-box login behavior
-if [[ -n "${SSH_CONNECTION:-}" ]] && [[ -t 0 ]] && [[ -t 1 ]] && [[ -z "${VSCODE_IPC_HOOK_CLI:-}" ]]; then
-  tmux attach -t codex || tmux new -s codex "cd /workspace && codex"
-fi
+source /opt/bootstrap/on-login.sh
 EOF
 
 RUN cp /opt/bootstrap/dev.bashrc /home/${DEV_USERNAME}/.bashrc \
