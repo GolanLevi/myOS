@@ -21,7 +21,7 @@ flex_ocpus         = null
 flex_memory_in_gbs = null
 
 ubuntu_version          = "24.04"
-boot_volume_size_in_gbs = 47
+boot_volume_size_in_gbs = 50
 data_volume_size_in_gbs = 50
 
 vcn_cidr    = "10.70.0.0/16"

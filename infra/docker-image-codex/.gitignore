@@ -1,0 +1,6 @@
+.env
+.env.local
+secrets/*.pem
+secrets/*.key
+secrets/*.json
+!secrets/*.example
