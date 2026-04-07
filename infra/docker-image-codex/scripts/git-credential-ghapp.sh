@@ -14,7 +14,7 @@ if [[ ! -f "${GH_APP_PRIVATE_KEY_PATH:-/run/secrets/github_app_private_key.pem}"
   exit 0
 fi
 
-token="$(python3 /opt/bootstrap/github_app_token.py)"
+token="$(/opt/pyenv/bin/python /opt/bootstrap/github_app_token.py)"
 if [[ -z "${token}" ]]; then
   exit 1
 fi

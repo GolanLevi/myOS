@@ -32,6 +32,11 @@
 ## Safe Contributor Setup
 Before changing this repo locally, use the isolated Codex dev box under [`infra/docker-image-codex`](infra/docker-image-codex/README.md). It keeps the repo inside a Docker volume, lets you connect through SSH from VS Code, and avoids exposing runtime secrets inside the working tree.
 
+Guides:
+- Local Docker dev box: [`infra/docker-image-codex/README.md`](infra/docker-image-codex/README.md)
+- OCI cloud-hosted dev box: [`infra/docker-image-codex/docs/OCI-DEVBOX.md`](infra/docker-image-codex/docs/OCI-DEVBOX.md)
+- Repo operator instructions: [`AGENTS.md`](AGENTS.md)
+
 Use this flow:
 1. Copy `infra/docker-image-codex/.env.example` to `infra/docker-image-codex/.env`.
 2. Fill in only the required values:
