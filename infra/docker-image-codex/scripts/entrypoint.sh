@@ -15,6 +15,9 @@ GIT_REF="${GIT_REF:-main}"
 GIT_USER_NAME="${GIT_USER_NAME:-myOS Agent}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-myos-agent@users.noreply.github.com}"
 GH_APP_PRIVATE_KEY_PATH="${GH_APP_PRIVATE_KEY_PATH:-/run/secrets/github_app_private_key.pem}"
+DEV_PATH="/opt/pyenv/bin:/usr/local/bin:/usr/bin:/bin"
+
+. /opt/bootstrap/sanitize-env.sh
 
 # Create group/user if needed.
 if ! getent group "${DEV_GID}" >/dev/null 2>&1; then
@@ -62,16 +65,39 @@ RC
 fi
 chown "${DEV_USERNAME}:${DEV_GID}" "${CODEX_HOME}/.bashrc"
 
-# Git defaults for the dev user.
-su - "${DEV_USERNAME}" -c "git config --global user.name \"${GIT_USER_NAME}\""
-su - "${DEV_USERNAME}" -c "git config --global user.email \"${GIT_USER_EMAIL}\""
-su - "${DEV_USERNAME}" -c "git config --global init.defaultBranch main"
-su - "${DEV_USERNAME}" -c "git config --global pull.ff only"
-su - "${DEV_USERNAME}" -c "git config --global credential.helper /opt/bootstrap/git-credential-ghapp.sh"
-su - "${DEV_USERNAME}" -c "git config --global core.editor 'vi'"
+# Git defaults for the dev user. Clear inherited helpers and use GitHub App only.
+cat >"${CODEX_HOME}/.gitconfig" <<EOF
+[user]
+	name = ${GIT_USER_NAME}
+	email = ${GIT_USER_EMAIL}
+[init]
+	defaultBranch = main
+[pull]
+	ff = only
+[credential]
+	helper =
+	helper = /opt/bootstrap/git-credential-ghapp.sh
+	interactive = never
+[core]
+	editor = vi
+	askPass =
+EOF
+chown "${DEV_USERNAME}:${DEV_GID}" "${CODEX_HOME}/.gitconfig"
+chmod 0600 "${CODEX_HOME}/.gitconfig"
 
 # Bootstrap / update repo if configured.
 if [[ -n "${GIT_REPO_URL}" ]]; then
+  DEV_USERNAME="${DEV_USERNAME}" \
+  WORKSPACE_DIR="${WORKSPACE_DIR}" \
+  CODEX_HOME="${CODEX_HOME}" \
+  DEV_PATH="${DEV_PATH}" \
+  GIT_REPO_URL="${GIT_REPO_URL}" \
+  GIT_REF="${GIT_REF}" \
+  BOOTSTRAP_GIT_SYNC_MODE="${BOOTSTRAP_GIT_SYNC_MODE:-resume}" \
+  GITHUB_APP_ID="${GITHUB_APP_ID:-}" \
+  GITHUB_APP_INSTALLATION_ID="${GITHUB_APP_INSTALLATION_ID:-}" \
+  GH_APP_PRIVATE_KEY_PATH="${GH_APP_PRIVATE_KEY_PATH}" \
+  GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}" \
   /opt/bootstrap/bootstrap_repo.sh
 fi
 

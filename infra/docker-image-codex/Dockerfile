@@ -11,16 +11,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
     sudo \
     git \
+    gh \
     tmux \
     python3 \
     python3-venv \
     python3-pip \
+    build-essential \
     ca-certificates \
     curl \
+    dnsutils \
+    fd-find \
+    file \
     jq \
     less \
+    netcat-openbsd \
     procps \
     nano \
+    ripgrep \
+    rsync \
+    unzip \
+    zip \
  && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /opt/pyenv \
@@ -51,6 +61,7 @@ COPY scripts/bootstrap_repo.sh /opt/bootstrap/bootstrap_repo.sh
 COPY scripts/git-credential-ghapp.sh /opt/bootstrap/git-credential-ghapp.sh
 COPY scripts/github_app_token.py /opt/bootstrap/github_app_token.py
 COPY scripts/on-login.sh /opt/bootstrap/on-login.sh
+COPY scripts/sanitize-env.sh /opt/bootstrap/sanitize-env.sh
 
 RUN chmod +x /opt/bootstrap/*.sh
 

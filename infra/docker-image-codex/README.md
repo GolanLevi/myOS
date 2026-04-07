@@ -6,6 +6,7 @@ This runs Codex inside a Docker container with:
 - persistent workspace (`codex-workspace` volume)
 - repo clone/update inside the container (no host repo bind mount)
 - GitHub App authentication for clone / fetch / pull / push
+- stripped inherited host git/token/SSH-agent credentials at runtime
 - tmux auto-resume so reconnecting over SSH returns you to the last Codex session
 
 ## How it works
@@ -44,6 +45,20 @@ For migration to cloud later:
 - real API keys / tokens
 - real Codex auth material
 - any private local-only overrides
+
+## Auth model
+This dev box is designed to authenticate GitHub operations through the mounted GitHub App private key and the values you set in `.env`.
+
+It now actively clears inherited host-side credential paths such as:
+- `GIT_ASKPASS`
+- `SSH_AUTH_SOCK`
+- `GH_TOKEN`
+- `GITHUB_TOKEN`
+
+That means the container should only know what you explicitly provide through:
+- `.env`
+- the mounted PEM file from `GH_APP_PRIVATE_KEY_FILE`
+- persisted login state inside the container volumes
 
 ## Critical information you need before first start
 
@@ -120,6 +135,8 @@ Host codex-local
 codex --login
 ```
 
+If you changed auth/bootstrap behavior or the Dockerfile, rerun the same start command so Docker rebuilds the image.
+
 ## Runtime behavior
 
 ### First startup
@@ -144,6 +161,17 @@ Set in `.env` if you want different behavior:
 - commit/push frequently so the branch is the portable state, not only the volume
 - keep secrets out of the repo
 - keep real secret files outside the repo and outside Codex-visible folders
+- use the GitHub App path for git operations; do not rely on forwarded host credentials
+
+## Tooling inside the box
+The image includes a fuller local toolbox so Codex can operate with less manual setup:
+- `gh`
+- `ripgrep`
+- `fd`
+- build tools
+- archive/network utilities
+
+This improves autonomy inside the container, but Codex platform sandbox approvals are still controlled outside the repo and are not changed by these files.
 
 ## Recommended prompt for Codex after login
 "Read `AGENTS.md`, `README.md`, and the repo docs. Explain the current architecture, the current branch, the next safe step, and what you need from me before making changes."

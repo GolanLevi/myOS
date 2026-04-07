@@ -3,6 +3,10 @@ services:
     build: .
     container_name: codex-box
     restart: unless-stopped
+    init: true
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
     ports:
       - "${SSH_PORT:-2222}:22"
     env_file:
@@ -14,6 +18,7 @@ services:
       WORKSPACE_DIR: /workspace
       CODEX_HOME: /home/${DEV_USERNAME:-dev}
       GH_APP_PRIVATE_KEY_PATH: /run/secrets/github_app_private_key.pem
+      GIT_TERMINAL_PROMPT: "0"
     volumes:
       - codex-home:/home/${DEV_USERNAME:-dev}
       - codex-workspace:/workspace

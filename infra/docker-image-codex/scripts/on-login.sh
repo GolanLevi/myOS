@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+. /opt/bootstrap/sanitize-env.sh
+
 # Auto-attach / create tmux session for interactive SSH logins.
 if [[ -n "${SSH_CONNECTION:-}" && -z "${TMUX:-}" ]]; then
   if [[ "${AUTO_ATTACH_TMUX:-true}" == "true" ]]; then
