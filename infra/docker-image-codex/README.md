@@ -1,13 +1,11 @@
 # Codex GitOps Dev Box
 
-This runs Codex inside a Docker container with:
+Use this when you want Codex to work inside an isolated container with:
 - SSH access for VS Code Remote-SSH
-- persistent home directory (`codex-home` volume)
-- persistent workspace (`codex-workspace` volume)
-- repo clone/update inside the container (no host repo bind mount)
-- GitHub App authentication for clone / fetch / pull / push
-- stripped inherited host git/token/SSH-agent credentials at runtime
-- tmux auto-resume so reconnecting over SSH returns you to the last Codex session
+- persistent `/home/dev` and `/workspace` Docker volumes
+- GitHub App auth for clone / fetch / pull / push
+- full in-container Codex autonomy by default
+- the repo AGENTS hierarchy plus optional operator-specific instructions
 
 ## How it works
 
@@ -45,6 +43,7 @@ For migration to cloud later:
 - real API keys / tokens
 - real Codex auth material
 - any private local-only overrides
+- local `.env` files for operator-specific bootstrapping
 
 ## Auth model
 This dev box is designed to authenticate GitHub operations through the mounted GitHub App private key and the values you set in `.env`.
@@ -60,49 +59,34 @@ That means the container should only know what you explicitly provide through:
 - the mounted PEM file from `GH_APP_PRIVATE_KEY_FILE`
 - persisted login state inside the container volumes
 
-## Critical information you need before first start
+## Required before first start
+- `SSH_PUBLIC_KEY`
+- `GITHUB_APP_ID`
+- `GITHUB_APP_INSTALLATION_ID`
+- `GH_APP_PRIVATE_KEY_FILE`
+- `GIT_REPO_URL`
+- `GIT_REF`
 
-### 1) SSH public key contents
-Used so you can SSH from VS Code / PowerShell into the container.
+Use your fork for day-to-day work. The repo URL and branch must match each other.
 
-PowerShell:
-```powershell
-Get-Content $HOME\.ssh\id_ed25519.pub
-```
-Paste the **contents** into `.env` as `SSH_PUBLIC_KEY=`.
-
-### 2) GitHub App ID
-GitHub -> Settings -> Developer settings -> GitHub Apps -> your app -> **App ID**
-
-### 3) GitHub App installation ID
-Install the app on the repo/account, then get the installation ID from the installation URL or API.
-A simple route is:
-- GitHub App page -> **Install App** / **Configure**
-- choose the repo
-- copy the installation ID from the URL if shown, or query it with GitHub API / browser dev tools.
-
-### 4) GitHub App private key PEM
-Download it from the GitHub App page after generating a private key.
-Store it outside the repo, for example:
+Example:
 ```text
-C:/Users/YOU/secrets/myos-github-app.private-key.pem
+GIT_REPO_URL=https://github.com/amitkapl/myOS.git
+GIT_REF=codex-devbox-autonomy-defaults
 ```
-Then put that path into `.env` as `GH_APP_PRIVATE_KEY_FILE=`.
 
-### 5) Repo URL and branch
-For example:
+## Optional operator-specific instruction file
+Create a non-secret file under:
 ```text
-GIT_REPO_URL=https://github.com/GolanLevi/myOS.git
-GIT_REF=chatGPT-amit/myos-infra
+docs/instructions/users/<name>.md
 ```
-Use a working branch while testing. Switch to `main` only after merge.
 
-### 6) Codex login
-First time only, after SSHing in:
-```bash
-codex --login
+Then set in `.env`:
+```text
+MYOS_OPERATOR_INSTRUCTIONS=<name>
 ```
-That login state persists in the `codex-home` volume.
+
+On login, the container home `AGENTS.md` tells Codex to load that file when it exists.
 
 ## Quick start
 
@@ -114,7 +98,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 Unblock-File .\scripts\start.ps1
 .\scripts\start.ps1
 ```
-4. Test SSH:
+The script now waits for the container to stay running and performs an SSH probe automatically.
+
+4. If the script succeeds, SSH should already be validated. Manual check:
 ```powershell
 ssh -p 2222 dev@127.0.0.1
 ```
@@ -130,7 +116,7 @@ Host codex-local
 ```
 6. VS Code -> `Remote-SSH: Connect to Host` -> `codex-local`
 7. Open `/workspace`
-8. In the terminal:
+8. First time only:
 ```bash
 codex --login
 ```
@@ -171,7 +157,34 @@ The image includes a fuller local toolbox so Codex can operate with less manual 
 - build tools
 - archive/network utilities
 
-This improves autonomy inside the container, but Codex platform sandbox approvals are still controlled outside the repo and are not changed by these files.
+## Behavior
+The container bootstraps Codex in a repo-controlled way:
+- `.bashrc` is repaired to short-circuit non-interactive shells, which keeps `ssh -T` and VS Code Remote-SSH working
+- `~/.codex/config.toml` is seeded with trusted entries for `/home/dev` and `/workspace`
+- interactive SSH logins start Codex through a wrapper script, so sandbox and approval defaults come from `.env`
+- login shells also export the GitHub App metadata from `.env`, so interactive `git fetch/pull/push` keeps using the same GitHub App path as bootstrap
+- `/home/dev/AGENTS.md` points Codex to the repo AGENTS hierarchy and optional user-specific instructions selected by `.env`
+- if repo bootstrap fails, the container still starts SSH so the box is recoverable instead of entering a restart loop
 
-## Recommended prompt for Codex after login
-"Read `AGENTS.md`, `README.md`, and the repo docs. Explain the current architecture, the current branch, the next safe step, and what you need from me before making changes."
+The default Codex CLI startup flags are:
+```text
+--sandbox danger-full-access
+--ask-for-approval never
+```
+
+You can tune them in `.env`:
+```text
+CODEX_SANDBOX_MODE=danger-full-access
+CODEX_APPROVAL_POLICY=never
+CODEX_ENABLE_WEB_SEARCH=false
+MYOS_OPERATOR_INSTRUCTIONS=amit
+```
+
+## Environment parity
+Use the same Git-managed files for both local Docker and cloud-hosted dev boxes:
+- same `infra/docker-image-codex` image build context
+- same `.env` keys and mounted GitHub App PEM
+- same named-volume style persistence goals, adapted to the target provider
+- same Codex startup wrapper and `AGENTS.md` loading model
+
+For the cloud-hosted version, use the OCI guide in [docs/OCI-DEVBOX.md](/workspace/infra/docker-image-codex/docs/OCI-DEVBOX.md). The same pattern can be applied to any cloud provider that can run Docker on a VM.
