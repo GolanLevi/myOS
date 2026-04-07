@@ -19,6 +19,10 @@ services:
       CODEX_HOME: /home/${DEV_USERNAME:-dev}
       GH_APP_PRIVATE_KEY_PATH: /run/secrets/github_app_private_key.pem
       GIT_TERMINAL_PROMPT: "0"
+      CODEX_SANDBOX_MODE: ${CODEX_SANDBOX_MODE:-danger-full-access}
+      CODEX_APPROVAL_POLICY: ${CODEX_APPROVAL_POLICY:-never}
+      CODEX_ENABLE_WEB_SEARCH: ${CODEX_ENABLE_WEB_SEARCH:-false}
+      MYOS_OPERATOR_INSTRUCTIONS: ${MYOS_OPERATOR_INSTRUCTIONS:-}
     volumes:
       - codex-home:/home/${DEV_USERNAME:-dev}
       - codex-workspace:/workspace

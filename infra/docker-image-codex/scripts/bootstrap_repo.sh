@@ -30,6 +30,8 @@ if [[ -z "${GIT_REPO_URL}" ]]; then
   exit 0
 fi
 
+echo "[bootstrap] target repo=${GIT_REPO_URL} ref=${GIT_REF} mode=${BOOTSTRAP_GIT_SYNC_MODE}"
+
 if [[ ! -d "${WORKSPACE_DIR}/.git" ]]; then
   echo "[bootstrap] cloning ${GIT_REPO_URL} into ${WORKSPACE_DIR}"
   rm -rf "${WORKSPACE_DIR:?}"/* "${WORKSPACE_DIR:?}"/.[!.]* "${WORKSPACE_DIR:?}"/..?* 2>/dev/null || true
