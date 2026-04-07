@@ -1,6 +1,6 @@
 # Codex GitOps Dev Box
 
-This runs Codex inside a Docker container with:
+Use this when you want Codex to work inside an isolated container with:
 - SSH access for VS Code Remote-SSH
 - persistent home directory (`codex-home` volume)
 - persistent workspace (`codex-workspace` volume)
@@ -62,42 +62,32 @@ That means the container should only know what you explicitly provide through:
 - the mounted PEM file from `GH_APP_PRIVATE_KEY_FILE`
 - persisted login state inside the container volumes
 
-## Critical information you need before first start
+## Required before first start
+- `SSH_PUBLIC_KEY`
+- `GITHUB_APP_ID`
+- `GITHUB_APP_INSTALLATION_ID`
+- `GH_APP_PRIVATE_KEY_FILE`
+- `GIT_REPO_URL`
+- `GIT_REF`
 
-### 1) SSH public key contents
-Used so you can SSH from VS Code / PowerShell into the container.
+Use your fork for day-to-day work. The repo URL and branch must match each other.
 
-PowerShell:
-```powershell
-Get-Content $HOME\.ssh\id_ed25519.pub
-```
-Paste the **contents** into `.env` as `SSH_PUBLIC_KEY=`.
-
-### 2) GitHub App ID
-GitHub -> Settings -> Developer settings -> GitHub Apps -> your app -> **App ID**
-
-### 3) GitHub App installation ID
-Install the app on the repo/account, then get the installation ID from the installation URL or API.
-A simple route is:
-- GitHub App page -> **Install App** / **Configure**
-- choose the repo
-- copy the installation ID from the URL if shown, or query it with GitHub API / browser dev tools.
-
-### 4) GitHub App private key PEM
-Download it from the GitHub App page after generating a private key.
-Store it outside the repo, for example:
+Example:
 ```text
-C:/Users/YOU/secrets/myos-github-app.private-key.pem
+GIT_REPO_URL=https://github.com/amitkapl/myOS.git
+GIT_REF=codex-devbox-autonomy-defaults
 ```
-Then put that path into `.env` as `GH_APP_PRIVATE_KEY_FILE=`.
 
-### 5) Repo URL and branch
-For example:
+## Optional operator-specific instruction file
+Create a non-secret file under:
 ```text
-GIT_REPO_URL=https://github.com/GolanLevi/myOS.git
-GIT_REF=chatGPT-amit/myos-infra
+docs/instructions/users/<name>.md
 ```
-Use a working branch while testing. Switch to `main` only after merge.
+
+Then set in `.env`:
+```text
+MYOS_OPERATOR_INSTRUCTIONS=<name>
+```
 
 ### 6) Optional operator-specific instruction file
 Create a non-secret file under:
@@ -230,5 +220,4 @@ Use the same Git-managed files for both local Docker and cloud-hosted dev boxes:
 
 For the cloud-hosted version, use the OCI guide in [docs/OCI-DEVBOX.md](/workspace/infra/docker-image-codex/docs/OCI-DEVBOX.md). The same pattern can be applied to any cloud provider that can run Docker on a VM.
 
-## Recommended prompt for Codex after login
-"Read `AGENTS.md`, `README.md`, and the repo docs. Explain the current architecture, the current branch, the next safe step, and what you need from me before making changes."
+For the cloud-hosted version, use the OCI guide in [docs/OCI-DEVBOX.md](/workspace/infra/docker-image-codex/docs/OCI-DEVBOX.md). The same pattern can be applied to any cloud provider that can run Docker on a VM.

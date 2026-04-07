@@ -170,18 +170,20 @@ chmod 0600 "${CODEX_HOME}/.gitconfig"
 
 # Bootstrap / update repo if configured.
 if [[ -n "${GIT_REPO_URL}" ]]; then
-  DEV_USERNAME="${DEV_USERNAME}" \
-  WORKSPACE_DIR="${WORKSPACE_DIR}" \
-  CODEX_HOME="${CODEX_HOME}" \
-  DEV_PATH="${DEV_PATH}" \
-  GIT_REPO_URL="${GIT_REPO_URL}" \
-  GIT_REF="${GIT_REF}" \
-  BOOTSTRAP_GIT_SYNC_MODE="${BOOTSTRAP_GIT_SYNC_MODE:-resume}" \
-  GITHUB_APP_ID="${GITHUB_APP_ID:-}" \
-  GITHUB_APP_INSTALLATION_ID="${GITHUB_APP_INSTALLATION_ID:-}" \
-  GH_APP_PRIVATE_KEY_PATH="${GH_APP_PRIVATE_KEY_PATH}" \
-  GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}" \
-  /opt/bootstrap/bootstrap_repo.sh
+  if ! DEV_USERNAME="${DEV_USERNAME}" \
+    WORKSPACE_DIR="${WORKSPACE_DIR}" \
+    CODEX_HOME="${CODEX_HOME}" \
+    DEV_PATH="${DEV_PATH}" \
+    GIT_REPO_URL="${GIT_REPO_URL}" \
+    GIT_REF="${GIT_REF}" \
+    BOOTSTRAP_GIT_SYNC_MODE="${BOOTSTRAP_GIT_SYNC_MODE:-resume}" \
+    GITHUB_APP_ID="${GITHUB_APP_ID:-}" \
+    GITHUB_APP_INSTALLATION_ID="${GITHUB_APP_INSTALLATION_ID:-}" \
+    GH_APP_PRIVATE_KEY_PATH="${GH_APP_PRIVATE_KEY_PATH}" \
+    GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}" \
+    /opt/bootstrap/bootstrap_repo.sh; then
+    echo "[entrypoint] repo bootstrap failed for ${GIT_REPO_URL}@${GIT_REF}; starting SSH anyway so the box remains recoverable" >&2
+  fi
 fi
 
 /usr/sbin/sshd -D -e
