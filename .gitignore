@@ -23,6 +23,8 @@ client_secret.json
 # IDEs
 .vscode/
 .idea/
+.agents/
+.playwright-cli/
 
 # Docker and local overrides
 docker-compose.override.yml
@@ -58,3 +60,20 @@ user_config.local.json
 
 # Test assets
 test_image.jpg
+
+# UI local artifacts
+ui/node_modules/
+ui/client/node_modules/
+ui/server/node_modules/
+ui/client/dist/
+ui/client/.vite/
+ui/server/.env
+ui/*.log
+ui/**/*.log
+
+# Local runtime outputs
+output/
+test-results/
+*.out.log
+*.err.log
+tmp-*.log

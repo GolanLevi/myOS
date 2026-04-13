@@ -1,5 +1,6 @@
 import logging
 import sys
+import io
 from typing import Optional
 
 class ColorFormatter(logging.Formatter):
@@ -37,7 +38,10 @@ def get_logger(name: str, level: int = logging.INFO):
     
     # Only add handler if it doesn't exist to prevent duplicate logs
     if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
+        stream = sys.stdout
+        if hasattr(sys.stdout, "buffer"):
+            stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        handler = logging.StreamHandler(stream)
         handler.setFormatter(ColorFormatter())
         logger.addHandler(handler)
         

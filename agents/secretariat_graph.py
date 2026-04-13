@@ -14,6 +14,7 @@ load_dotenv()
 from utils.calendar_tools_lc import calendar_tools
 from utils.gmail_tools_lc import gmail_tools
 from agents.information_agent import KnowledgeAgent
+from utils.cost_logger import extract_token_counts, log_llm_cost
 from utils.logger import agent_logger
 
 # State Definition for the secretariat workflow graph
@@ -71,13 +72,14 @@ def _transient_retry_delay_seconds(exc: Exception) -> float | None:
     return 1.0
 
 
-def _build_llm_candidates() -> list[tuple[str, object]]:
-    candidates: list[tuple[str, object]] = []
+def _build_llm_candidates() -> list[tuple[str, str, object]]:
+    candidates: list[tuple[str, str, object]] = []
 
     if GEMINI_API_KEY:
         candidates.append(
             (
                 "gemini",
+                "gemini-flash-latest",
                 ChatGoogleGenerativeAI(
                     model="gemini-flash-latest",
                     google_api_key=GEMINI_API_KEY,
@@ -90,6 +92,7 @@ def _build_llm_candidates() -> list[tuple[str, object]]:
         candidates.append(
             (
                 "anthropic",
+                "claude-3-5-haiku-latest",
                 ChatAnthropic(
                     model="claude-3-5-haiku-latest",
                     api_key=ANTHROPIC_API_KEY,
@@ -102,6 +105,7 @@ def _build_llm_candidates() -> list[tuple[str, object]]:
         candidates.append(
             (
                 "groq",
+                "llama-3.3-70b-versatile",
                 ChatGroq(
                     model="llama-3.3-70b-versatile",
                     api_key=GROQ_API_KEY,
@@ -116,7 +120,7 @@ def _build_llm_candidates() -> list[tuple[str, object]]:
 LLM_CANDIDATES = _build_llm_candidates()
 
 
-def invoke_with_fallback(messages: list[BaseMessage]):
+def invoke_with_fallback(messages: list[BaseMessage], *, user_id: str = "admin"):
     global ACTIVE_PROVIDER
 
     if not LLM_CANDIDATES:
@@ -130,10 +134,28 @@ def invoke_with_fallback(messages: list[BaseMessage]):
         )
 
     last_error: Exception | None = None
-    for provider_name, client in ordered_candidates:
+    for provider_name, configured_model, client in ordered_candidates:
         for attempt in range(2):
             try:
                 response = client.invoke(messages)
+                input_tokens, output_tokens = extract_token_counts(response)
+                metadata = {"estimated": False}
+                if input_tokens <= 0 and output_tokens <= 0:
+                    input_tokens = max(estimate_tokens(messages), 0)
+                    output_tokens = max(estimate_tokens([response]), 0)
+                    metadata["estimated"] = True
+                model_name = (
+                    getattr(response, "response_metadata", {}) or {}
+                ).get("model_name") or configured_model
+                log_llm_cost(
+                    user_id=user_id,
+                    agent_name="SecretariatAgent",
+                    provider=provider_name,
+                    model=str(model_name),
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    metadata=metadata,
+                )
                 if ACTIVE_PROVIDER != provider_name:
                     agent_logger.warning(f"🔁 LLM provider switched to {provider_name}.")
                 ACTIVE_PROVIDER = provider_name
@@ -246,7 +268,7 @@ GOLDEN WINDOWS: Prefer slots that preserve buffers, avoid back-to-back meetings 
 5. FORMATTING
 ═══════════════════════════════════════════
 DATES: "יום [שם יום], DD.MM.YYYY בשעה HH:MM"
-SUMMARIES: Always paraphrase the email in 1-2 of YOUR OWN concise sentences in HEBREW. Never copy-paste from the original email body. The goal is a short, readable summary that captures the essence.
+SUMMARIES: Always paraphrase the email in YOUR OWN words in HEBREW, but keep it ultra-short: 4-8 words or one very short sentence (max 12 words). Never copy-paste from the original email body.
 
 BUTTONS: Every response requiring action MUST end with:
 [[BUTTONS: Option A | Option B | אתן הכוונה]]
@@ -379,7 +401,7 @@ def agent_node(state: SecretariatGraphState):
     for i, msg in enumerate(sanitized_messages):
         agent_logger.debug(f"  [Msg {i}] Type: {type(msg)}, Content: {repr(getattr(msg, 'content', None))}, ToolCalls: {getattr(msg, 'tool_calls', 'None')}")
     
-    response = invoke_with_fallback(sanitized_messages)
+    response = invoke_with_fallback(sanitized_messages, user_id=state.get("user_id", "admin"))
     return {"messages": [response]}
 
 def route_tools(state: SecretariatGraphState) -> Literal["safe_tools", "sensitive_tools", "__end__"]:
@@ -430,4 +452,3 @@ def build_secretariat_graph(checkpointer=None):
 # Backward-compatible alias during the naming transition.
 AgentState = SecretariatGraphState
 build_graph = build_secretariat_graph
-

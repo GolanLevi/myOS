@@ -1,6 +1,8 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
+
+  # ── Python AI Backend (LangGraph + FastAPI) ─────────────────────────────────
   server:
     build: .
     container_name: myos_server
@@ -22,16 +24,61 @@ services:
       - mongo
       - chromadb
     command: python main.py
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5).read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
+  # ── Dashboard API (Node.js / Express) ───────────────────────────────────────
+  ui_server:
+    build: ./ui/server
+    container_name: myos_ui_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./ui/server:/app
+      - /app/node_modules          # prevent host node_modules from overriding
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/myos_dashboard
+      - JWT_SECRET=${DASHBOARD_JWT_SECRET:-myos_super_secret_change_me}
+      - PYTHON_API_URL=http://server:8000
+      - PORT=5000
+      - NODE_ENV=development
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  # ── Dashboard UI (React / Vite) ──────────────────────────────────────────────
+  ui_client:
+    build: ./ui/client
+    container_name: myos_ui_client
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./ui/client:/app
+      - /app/node_modules          # prevent host node_modules from overriding
+    environment:
+      - VITE_API_TARGET=http://host.docker.internal:5000
+      - VITE_REAL_API_PROXY_TARGET=http://host.docker.internal:8080
+      - VITE_DASHBOARD_BACKEND=real
+      - VITE_REAL_APPROVALS_ENABLED=true
+    depends_on:
+      - ui_server
+    restart: unless-stopped
+
+  # ── MongoDB ──────────────────────────────────────────────────────────────────
   mongo:
     image: mongo:latest
     container_name: myos_mongo
-    command: [ "mongod", "--quiet", "--logpath", "/dev/null" ]
+    command: ["mongod", "--quiet", "--logpath", "/dev/null"]
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
 
+  # ── ChromaDB (Vector store for RAG) ─────────────────────────────────────────
   chromadb:
     image: chromadb/chroma:latest
     container_name: myos_rag
@@ -40,6 +87,7 @@ services:
     volumes:
       - chroma_data:/chroma/chroma
 
+  # ── n8n (Gmail webhook trigger) ──────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: myos_n8n
@@ -47,12 +95,19 @@ services:
       - "5678:5678"
     environment:
       - N8N_PORT=5678
-      - N8N_PROTOCOL=https
+      - N8N_PROTOCOL=http
+      - N8N_HOST=localhost
+      - N8N_EDITOR_BASE_URL=http://localhost:5678
       - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
       - TZ=Asia/Jerusalem
     volumes:
       - n8n_data:/home/node/.n8n
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
 
+  # ── ngrok (Public tunnel for webhooks) ───────────────────────────────────────
   ngrok:
     image: ngrok/ngrok:latest
     container_name: myos_tunnel
