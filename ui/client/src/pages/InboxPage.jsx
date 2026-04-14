@@ -7,7 +7,7 @@ import {
   IS_REAL_PREVIEW,
 } from '../lib/apiClient.js';
 import { getVisibleInboxItems } from '../lib/inboxFilters.js';
-import { timeAgo, cn, detectTextDirection } from '../lib/utils.js';
+import { timeAgo, cn, detectTextDirection, getDirectionalTextProps } from '../lib/utils.js';
 import AgentRichText from '../components/AgentRichText.jsx';
 import {
   Mail,
@@ -164,6 +164,7 @@ export default function InboxPage() {
             const src = SOURCE_ICONS[item.source] || SOURCE_ICONS.system;
             const SrcIcon = src.icon;
             const isOpen = expanded === item._id;
+            const titleProps = getDirectionalTextProps(item.title || item.content || '', 'rtl');
             return (
               <div
                 key={item._id}
@@ -171,20 +172,21 @@ export default function InboxPage() {
               >
                 <div className="flex items-start gap-3 p-4">
                   <button
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    dir={titleProps.dir}
+                    className={cn('flex min-w-0 flex-1 items-start gap-3', titleProps.textAlignClass)}
                     onClick={() => handleExpand(item._id)}
                   >
                     <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5', src.bg)}>
                       <SrcIcon size={13} className={src.color} />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className={cn('flex-1 min-w-0', titleProps.textAlignClass)}>
                       <div className="flex items-center gap-2">
                         {!item.read && <div className="w-1.5 h-1.5 rounded-full bg-accent-indigo flex-shrink-0" />}
                         <p className={cn('text-sm leading-snug', !item.read ? 'font-semibold text-text-primary' : 'font-medium text-text-secondary')}>
                           {item.title}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <div className={cn('mt-1 flex items-center gap-2 flex-wrap', titleProps.dir === 'rtl' ? 'justify-end' : 'justify-start')}>
                         <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[item.priority])} />
                         <span className="text-[10px] text-text-muted capitalize">{item.priority} priority</span>
                         <span className="text-text-muted text-[10px]">·</span>

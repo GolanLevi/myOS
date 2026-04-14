@@ -202,6 +202,23 @@
 - The practical takeaway is that card height, internal padding, and label cadence should be adjustable as a system.
 - For myOS this supports shrinking `Today` and `Approvals` into one compact card language instead of mixing oversized hero blocks with dense queue cards.
 
+### Topic: Global RTL/LTR handling for mixed-language dashboards and chats
+
+#### Source: https://www.w3.org/International/questions/qa-html-dir
+- User-generated content should not inherit a single page-wide direction blindly. The browser should get direction hints close to the content block itself.
+- `dir="auto"` and scoped direction assignment are the safe defaults for mixed-language products.
+- For myOS this supports field-level direction on chat bubbles, inbox rows, and approval summaries instead of mirroring entire screens.
+
+#### Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/dir
+- The `dir` attribute is the semantic source of truth for text direction and should be set on the element that owns the content, not only via CSS alignment.
+- Mixed-content UIs should separate alignment from data order so English emails, URLs, and timestamps can stay `LTR` inside an otherwise Hebrew experience.
+- For myOS this supports a shared helper that returns both `dir` and alignment class for every dynamic text block.
+
+#### Source: https://firefox-source-docs.mozilla.org/code-quality/coding-style/rtl_guidelines.html
+- Fragments such as emails, usernames, and timestamps should stay `LTR` explicitly even when nearby content is `RTL`.
+- Firefox guidance also reinforces that bidi handling should be granular and predictable, not based on a single container assumption.
+- For myOS this supports keeping timestamps and technical identifiers pinned to `LTR` while the surrounding message or summary aligns by detected language.
+
 #### Source: https://uxuiprinciples.com/en/principles/progressive-disclosure
 - Progressive disclosure works best when the overview keeps only the attributes needed for the next decision and defers everything else until the user explicitly asks for depth.
 - Human working memory remains a hard constraint, so overloaded overview screens feel worse even when all the data is technically useful.

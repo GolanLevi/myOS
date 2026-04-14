@@ -1,6 +1,6 @@
 import { Activity, CheckCircle2, Clock3, RefreshCw, TimerReset } from 'lucide-react';
 import { useApi } from '../hooks/useApi.js';
-import { AGENT_COLORS, STATUS_COLORS, cn, timeAgo } from '../lib/utils.js';
+import { AGENT_COLORS, STATUS_COLORS, cn, timeAgo, getDirectionalTextProps } from '../lib/utils.js';
 import {
   DashboardEmptyState,
   DashboardHero,
@@ -85,6 +85,7 @@ export default function TimelinePage() {
               {items.map((item, idx) => {
                 const color = AGENT_COLORS[item.agentName] || '#94a3b8';
                 const statusCls = STATUS_COLORS[item.status] || 'text-text-muted';
+                const descriptionProps = getDirectionalTextProps(item.description || '', 'rtl');
 
                 return (
                   <div key={item._id} className="relative animate-fade-in" style={{ animationDelay: `${idx * 30}ms` }}>
@@ -109,10 +110,15 @@ export default function TimelinePage() {
                               {STATUS_LABEL[item.status] || item.status}
                             </span>
                           </div>
-                          <p className="text-[14px] leading-6 text-text-primary">{item.description}</p>
+                          <p
+                            dir={descriptionProps.dir}
+                            className={cn('text-[14px] leading-6 text-text-primary', descriptionProps.textAlignClass)}
+                          >
+                            {item.description}
+                          </p>
                         </div>
 
-                        <div className="text-right text-[11px] text-text-muted">
+                        <div dir="ltr" className="text-left text-[11px] text-text-muted">
                           <p className="whitespace-nowrap">{timeAgo(item.createdAt)}</p>
                           {item.minutesSaved > 0 ? (
                             <p className="mt-1 text-accent-green">+{item.minutesSaved}m saved</p>

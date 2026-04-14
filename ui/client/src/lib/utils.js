@@ -63,6 +63,22 @@ export function detectTextDirection(text, fallback = 'rtl') {
   return fallback;
 }
 
+export function getDirectionalTextClass(textOrDirection, fallback = 'rtl') {
+  const direction = textOrDirection === 'rtl' || textOrDirection === 'ltr'
+    ? textOrDirection
+    : detectTextDirection(textOrDirection, fallback);
+
+  return direction === 'rtl' ? 'text-right' : 'text-left';
+}
+
+export function getDirectionalTextProps(text, fallback = 'rtl') {
+  const dir = detectTextDirection(text, fallback);
+  return {
+    dir,
+    textAlignClass: getDirectionalTextClass(dir),
+  };
+}
+
 export function splitTextBlocks(text) {
   return String(text || '')
     .split(/\n{2,}/)

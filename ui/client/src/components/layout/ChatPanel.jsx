@@ -4,7 +4,7 @@ import { useApi } from '../../hooks/useApi.js';
 import {
   timeAgo,
   cn,
-  detectTextDirection,
+  getDirectionalTextProps,
   parseButtonMarker,
   stripButtonMarker,
 } from '../../lib/utils.js';
@@ -291,6 +291,9 @@ export default function ChatPanel() {
 
   const activeDisplayTitle = summarizeConversationTitle(convTitle, messages[messages.length - 1]?.content);
   const activeVisual = getTopicVisual(activeDisplayTitle, messages[messages.length - 1]?.content);
+  const activeTitleText = activeDisplayTitle || 'Knowledge Agent';
+  const activeTitleProps = getDirectionalTextProps(activeTitleText, 'ltr');
+  const composerProps = getDirectionalTextProps(inputText, 'rtl');
 
   return (
     <aside className="w-[344px] xl:w-[360px] flex-shrink-0 border-l border-border bg-gradient-to-b from-bg-secondary to-[#0d1119]">
@@ -344,7 +347,7 @@ export default function ChatPanel() {
                   const lastMessage = getLastConversationMessage(conv);
                   const previewText = stripButtonMarker(lastMessage?.content || '');
                   const displayTitle = summarizeConversationTitle(conv.title, previewText);
-                  const direction = detectTextDirection(displayTitle, 'ltr');
+                  const titleProps = getDirectionalTextProps(displayTitle || 'Conversation', 'ltr');
                   const visual = getTopicVisual(displayTitle, previewText);
 
                   return (
@@ -360,10 +363,10 @@ export default function ChatPanel() {
                       <div className="flex items-start gap-2 p-2.5">
                         <button
                           onClick={() => openConversation(conv._id)}
-                          dir={direction}
+                          dir={titleProps.dir}
                           className={cn(
-                            'flex min-w-0 flex-1 items-start gap-3 rounded-[18px] p-1.5 text-left',
-                            direction === 'rtl' ? 'text-right' : 'text-left'
+                            'flex min-w-0 flex-1 items-start gap-3 rounded-[18px] p-1.5',
+                            titleProps.textAlignClass
                           )}
                         >
                           <div className={cn('mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl border', visual.ringClass)}>
@@ -422,13 +425,13 @@ export default function ChatPanel() {
 
               <div className="min-w-0 flex-1">
                 <p
-                  dir={detectTextDirection(activeDisplayTitle, 'ltr')}
+                  dir={activeTitleProps.dir}
                   className={cn(
                     'truncate text-[12px] font-semibold tracking-[0.02em] text-text-primary',
-                    detectTextDirection(activeDisplayTitle, 'ltr') === 'rtl' ? 'text-right' : 'text-left'
+                    activeTitleProps.textAlignClass
                   )}
                 >
-                  {activeDisplayTitle || 'Knowledge Agent'}
+                  {activeTitleText}
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.24em] text-text-muted">
                   Live thread
@@ -461,11 +464,11 @@ export default function ChatPanel() {
                 {messages.map((msg, idx) => {
                   const parsed = parseButtonMarker(msg.content);
                   const visibleText = parsed.text;
-                  const direction = detectTextDirection(
+                  const bubbleProps = getDirectionalTextProps(
                     visibleText || msg.content,
                     msg.role === 'assistant' ? 'rtl' : 'ltr'
                   );
-                  const isRtl = direction === 'rtl';
+                  const isRtl = bubbleProps.dir === 'rtl';
                   const visual = getTopicVisual(convTitle, visibleText || msg.content);
 
                   return (
@@ -485,10 +488,10 @@ export default function ChatPanel() {
                       <div className="max-w-[82%]">
                         {(visibleText || '').trim() ? (
                           <div
-                            dir={direction}
+                            dir={bubbleProps.dir}
                             className={cn(
                               'rounded-[22px] px-3.5 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.14)]',
-                              isRtl ? 'text-right' : 'text-left',
+                              bubbleProps.textAlignClass,
                               msg.role === 'user'
                                 ? 'bg-accent-indigo text-white rounded-br-md shadow-[0_16px_36px_rgba(99,102,241,0.22)]'
                                 : 'border border-border/80 bg-bg-card/92 text-text-primary rounded-bl-md'
@@ -508,7 +511,7 @@ export default function ChatPanel() {
                               dir="ltr"
                               className={cn(
                                 'mt-2 text-[10px]',
-                                isRtl ? 'text-right' : 'text-left',
+                                bubbleProps.textAlignClass,
                                 msg.role === 'user' ? 'text-white/60' : 'text-text-muted'
                               )}
                             >
@@ -521,6 +524,7 @@ export default function ChatPanel() {
                           <div className="mt-2 flex flex-wrap gap-2">
                             {parsed.buttons.map((label) => {
                               const buttonVisual = getActionVisual(label);
+                              const labelProps = getDirectionalTextProps(label, 'rtl');
                               return (
                                 <button
                                   key={`${msg._id || idx}-${label}`}
@@ -532,7 +536,7 @@ export default function ChatPanel() {
                                   )}
                                 >
                                   <buttonVisual.Icon size={12} />
-                                  <span dir={detectTextDirection(label, 'rtl')}>{label}</span>
+                                  <span dir={labelProps.dir} className={labelProps.textAlignClass}>{label}</span>
                                 </button>
                               );
                             })}
@@ -578,10 +582,10 @@ export default function ChatPanel() {
                 placeholder="Write a message"
                 rows={1}
                 disabled={sending}
-                dir={detectTextDirection(inputText, 'rtl')}
+                dir={composerProps.dir}
                 className={cn(
                   'min-h-[42px] max-h-[120px] flex-1 resize-none appearance-none rounded-[18px] border border-border/80 bg-bg-card/88 px-3.5 py-2.5 text-[12px] text-text-primary transition-all duration-150 focus:border-accent-indigo/60 focus:outline-none focus:ring-1 focus:ring-accent-indigo/20',
-                  detectTextDirection(inputText, 'rtl') === 'rtl' ? 'text-right' : 'text-left',
+                  composerProps.textAlignClass,
                   'placeholder:text-text-muted disabled:opacity-50'
                 )}
                 style={{

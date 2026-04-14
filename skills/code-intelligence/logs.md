@@ -66,3 +66,8 @@
 - If a live list is fetched from the FastAPI dashboard but its trash action still points at the local demo Mongo route, the delete button will look broken even when both code paths work independently. Read and write routes must hit the same backend.
 - Inbox cards should not nest a trash `<button>` inside the main card `<button>`. That markup is invalid and creates flaky click behavior.
 - Suppression rules for ignored and low-priority email items should live in the backend first, with a small frontend guard so stale or mixed payloads still stay out of the inbox.
+
+## 2026-04-14 - Directionality should be centralized, not patched per page
+- Mixed Hebrew and English interfaces drift quickly if each page decides `RTL` and `LTR` in its own way. A shared helper for `dir` plus alignment class keeps chat, inbox, and timeline consistent.
+- Page-level `dir` is too blunt for this product. Dynamic content needs per-block direction, while identifiers such as timestamps, emails, and usernames should remain explicitly `LTR`.
+- When direction is fixed only through CSS classes and not semantic `dir`, nested rich text starts looking correct in one place and broken in another. Set both together.
