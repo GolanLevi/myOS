@@ -152,13 +152,21 @@ Current Gmail and Calendar utilities:
 - `C:\Users\97250\myOS\utils\gmail_tools_lc.py`
 - `C:\Users\97250\myOS\utils\calendar_tools.py`
 - `C:\Users\97250\myOS\utils\calendar_tools_lc.py`
+- `C:\Users\97250\myOS\utils\credential_store.py`
+- `C:\Users\97250\myOS\utils\request_context.py`
 
-Critical limitation:
-- connector auth still relies on shared local files:
+Current migration status:
+- active execution now has a user-aware request context for graph and connector calls
+- encrypted per-user credential storage now exists in MongoDB
+- an operational connection script now exists:
+  - `C:\Users\97250\myOS\scripts\connect_google_for_user.py`
+
+Remaining limitation:
+- connector auth still has a legacy fallback on shared local files for admin:
   - `credentials.json`
   - `token.json`
 
-That must be replaced before serious multi-user rollout.
+That fallback is transitional only and must be removed after connector onboarding and migration are complete.
 
 ### 3.6 Cost and time logging
 
@@ -472,8 +480,8 @@ Required work:
 
 The next correct order is:
 
-1. remove `"admin"` defaults from the active UI-to-backend paths
-2. redesign Google auth storage around per-user encrypted credentials
+1. finish Google connector onboarding around the new encrypted credential store
+2. migrate existing admin credentials into the new store and remove direct operational dependence on `token.json`
 3. partition memory and graph state
 4. only then add more users in production
 5. only after that add banks and social connectors

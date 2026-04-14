@@ -20,6 +20,7 @@ from agents.information_agent import KnowledgeAgent
 from core.state_manager import WorkflowStateStore
 from utils.calendar_tools import get_upcoming_events, get_events_for_date, normalize_event_summary
 from utils.gmail_tools import fetch_email_by_id, send_email as gmail_send_email
+from utils.request_context import active_user_context
 
 # ייבוא הגרף החדש
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage, BaseMessage
@@ -1814,6 +1815,22 @@ def _resolve_request_user_id(payload: RequestModel) -> str:
     return "admin"
 
 
+def _graph_invoke_as_user(user_id: str, payload: Any, config: dict[str, Any]):
+    with active_user_context(user_id):
+        return graph.invoke(payload, config)
+
+
+def _graph_stream_as_user(user_id: str, payload: Any, config: dict[str, Any], *, stream_mode: str = "values"):
+    with active_user_context(user_id):
+        for event in graph.stream(payload, config, stream_mode=stream_mode):
+            yield event
+
+
+def _gmail_send_email_as_user(user_id: str, *args, **kwargs):
+    with active_user_context(user_id):
+        return gmail_send_email(*args, **kwargs)
+
+
 @app.get("/")
 def home():
     return {"status": "online", "message": "MyOS Manager (LangGraph) is running"}
@@ -3141,7 +3158,7 @@ def ask_brain(payload: RequestModel):
                 approval_requests_send = is_send_style_approval(user_text) or approval_targets_draft
                 approval_context_is_meeting = _context_looks_like_meeting(state.values.get("messages", []))
                 # הזרמת None תשחרר את הברקס ותריץ את הכלים
-                graph.invoke(None, config)
+                _graph_invoke_as_user(user_id, None, config)
                 post_state = graph.get_state(config)
                 auto_resume_budget = 3
                 while auto_resume_budget > 0:
@@ -3185,12 +3202,12 @@ def ask_brain(payload: RequestModel):
                                 ]
                             },
                         )
-                        graph.invoke(None, config)
+                        _graph_invoke_as_user(user_id, None, config)
                         post_state = graph.get_state(config)
                         auto_resume_budget -= 1
                         continue
                     server_logger.info("🔁 Continuing approved flow through an additional sensitive step.")
-                    graph.invoke(None, config)
+                    _graph_invoke_as_user(user_id, None, config)
                     post_state = graph.get_state(config)
                     auto_resume_budget -= 1
                 post_messages = post_state.values.get("messages", [])
@@ -3223,7 +3240,8 @@ def ask_brain(payload: RequestModel):
                         )
                         draft_args = (draft_call or {}).get("args", {})
                         if draft_args.get("to_email") and draft_args.get("subject") and draft_args.get("body"):
-                            sent_id = gmail_send_email(
+                            sent_id = _gmail_send_email_as_user(
+                                user_id,
                                 draft_args["to_email"],
                                 draft_args["subject"],
                                 draft_args["body"],
@@ -3302,7 +3320,7 @@ def ask_brain(payload: RequestModel):
                          name=tc['name'], 
                          status="error"
                      ))
-                events = graph.stream({"messages": messages_to_add}, config, stream_mode="values")
+                events = _graph_stream_as_user(user_id, {"messages": messages_to_add}, config, stream_mode="values")
                 for event in events: pass # run to completion
                 msg = "❌ הפעולה בוטלה."
                 return _build_response(answer=msg, internal_id=thread_id, is_paused=False)
@@ -3332,7 +3350,7 @@ def ask_brain(payload: RequestModel):
     approval_from_existing_context = bool(is_approval(user_text) and (embedded_thread_id or payload.reply_to_message_id))
     user_input_msg = HumanMessage(content=user_text)
     
-    events = graph.stream({"messages": [user_input_msg], "user_id": user_id}, config, stream_mode="values")
+    events = _graph_stream_as_user(user_id, {"messages": [user_input_msg], "user_id": user_id}, config, stream_mode="values")
     
     final_output = ""
     for event in events:
@@ -3363,7 +3381,7 @@ def ask_brain(payload: RequestModel):
         final_output = ""
         auto_resume_budget = 3
         while auto_resume_budget > 0:
-            for event in graph.stream(None, config, stream_mode="values"):
+            for event in _graph_stream_as_user(user_id, None, config, stream_mode="values"):
                 if "messages" in event:
                     last_msg = event["messages"][-1]
                     content_text = extract_text(last_msg.content)
@@ -3591,7 +3609,7 @@ def analyze_incoming_event(payload: RequestModel):
     server_logger.info(f"⏳ Waiting in queue to process email (thread: {internal_id})...")
     with email_processing_lock:
         server_logger.info(f"▶️ Processing email (thread: {internal_id})...")
-        events = graph.stream({"messages": [user_input_msg], "user_id": user_id}, config, stream_mode="values")
+        events = _graph_stream_as_user(user_id, {"messages": [user_input_msg], "user_id": user_id}, config, stream_mode="values")
         
         for event in events:
             if "messages" in event:
@@ -3635,7 +3653,7 @@ def analyze_incoming_event(payload: RequestModel):
             )
             final_output = ""
             last_aimsg = None
-            for event in graph.stream(None, config, stream_mode="values"):
+            for event in _graph_stream_as_user(user_id, None, config, stream_mode="values"):
                 if "messages" in event:
                     msg = event["messages"][-1]
                     if isinstance(msg, AIMessage):
@@ -3672,7 +3690,7 @@ def analyze_incoming_event(payload: RequestModel):
             )
             final_output = ""
             last_aimsg = None
-            for event in graph.stream(None, config, stream_mode="values"):
+            for event in _graph_stream_as_user(user_id, None, config, stream_mode="values"):
                 if "messages" in event:
                     msg = event["messages"][-1]
                     if isinstance(msg, AIMessage):
@@ -3691,7 +3709,8 @@ def analyze_incoming_event(payload: RequestModel):
         final_output = ""
         last_aimsg = None
         with email_processing_lock:
-            for event in graph.stream(
+            for event in _graph_stream_as_user(
+                user_id,
                 {"messages": [HumanMessage(content=corrective_prompt)], "user_id": user_id},
                 config,
                 stream_mode="values",

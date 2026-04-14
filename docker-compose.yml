@@ -15,6 +15,7 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017
       - CHROMA_HOST=chromadb
+      - MYOS_CREDENTIALS_KEY=${MYOS_CREDENTIALS_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TZ=Asia/Jerusalem

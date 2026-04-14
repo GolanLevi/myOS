@@ -77,3 +77,15 @@ test-results/
 *.out.log
 *.err.log
 tmp-*.log
+
+# Local agent skill metadata
+skills-lock.json
+
+# Local-only operational scripts
+scripts/__pycache__/
+scripts/backfill_legacy_pending_actions.py
+scripts/check_approvals_ui.js
+scripts/check_today_preview_ui.js
+scripts/check_ui_english_and_chat_bidi.js
+scripts/hebrew_hitl_smoke.py
+scripts/send_hebrew_test_emails.py
