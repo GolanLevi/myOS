@@ -61,3 +61,8 @@
 - The clean migration path is not to rewrite every Gmail and Calendar tool signature at once. Add a user-aware execution context, then let connector lookups resolve the active user from that context.
 - Shared local `token.json` can remain as a temporary admin fallback during migration, but only if the encrypted per-user store becomes the default path for every new user.
 - A small operational script for interactive Google connection is worthwhile before full UI onboarding exists. It lets the backend move to the new credential model immediately without blocking on a complete connector settings experience.
+
+## 2026-04-14 - Email Inbox needs one source of truth for dismiss actions
+- If a live list is fetched from the FastAPI dashboard but its trash action still points at the local demo Mongo route, the delete button will look broken even when both code paths work independently. Read and write routes must hit the same backend.
+- Inbox cards should not nest a trash `<button>` inside the main card `<button>`. That markup is invalid and creates flaky click behavior.
+- Suppression rules for ignored and low-priority email items should live in the backend first, with a small frontend guard so stale or mixed payloads still stay out of the inbox.

@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useApi } from '../../hooks/useApi.js';
+import { getVisibleInboxItems } from '../../lib/inboxFilters.js';
 import {
   LayoutDashboard, Mail, CheckSquare, Clock, DollarSign,
   Settings, Plug, LogOut, Bot, Bell
@@ -24,7 +25,7 @@ export default function Sidebar() {
   const { data: approvals } = useApi('/api/approvals', { params: { status: 'pending' } });
   const { data: summaries } = useApi('/api/summaries', { params: { unread: 'true' } });
   const approvalItems = Array.isArray(approvals) ? approvals : [];
-  const summaryItems = Array.isArray(summaries) ? summaries : [];
+  const summaryItems = getVisibleInboxItems(Array.isArray(summaries) ? summaries : []);
 
   const counts = {
     approvals: approvalItems.length,

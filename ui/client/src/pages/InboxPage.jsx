@@ -6,6 +6,7 @@ import {
   DASHBOARD_MODE_LABEL,
   IS_REAL_PREVIEW,
 } from '../lib/apiClient.js';
+import { getVisibleInboxItems } from '../lib/inboxFilters.js';
 import { timeAgo, cn, detectTextDirection } from '../lib/utils.js';
 import AgentRichText from '../components/AgentRichText.jsx';
 import {
@@ -54,7 +55,7 @@ export default function InboxPage() {
   const { mutate: deleteSummary } = useMutation('delete', '/api/summaries');
   const [busy, setBusy] = useState(null);
 
-  const summaryItems = Array.isArray(items) ? items : [];
+  const summaryItems = getVisibleInboxItems(Array.isArray(items) ? items : []);
   const actionableItems = summaryItems.filter((item) => item.isActionable);
   const contextItems = summaryItems.filter((item) => !item.isActionable);
 
@@ -74,7 +75,6 @@ export default function InboxPage() {
 
   const handleDismiss = async (e, id) => {
     e.stopPropagation(); // prevent expanding
-    if (readOnlyPreview) return;
     setBusy(id);
     try {
       await deleteSummary({}, `/${id}`);
@@ -169,46 +169,52 @@ export default function InboxPage() {
                 key={item._id}
                 className={cn('card transition-all duration-200 group', !item.read && 'border-border-light', isOpen && 'glow-indigo')}
               >
-                <button
-                  className="w-full p-4 flex items-start gap-3 text-left"
-                  onClick={() => handleExpand(item._id)}
-                >
-                  <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5', src.bg)}>
-                    <SrcIcon size={13} className={src.color} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {!item.read && <div className="w-1.5 h-1.5 rounded-full bg-accent-indigo flex-shrink-0" />}
-                      <p className={cn('text-sm leading-snug', !item.read ? 'font-semibold text-text-primary' : 'font-medium text-text-secondary')}>
-                        {item.title}
-                      </p>
+                <div className="flex items-start gap-3 p-4">
+                  <button
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    onClick={() => handleExpand(item._id)}
+                  >
+                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5', src.bg)}>
+                      <SrcIcon size={13} className={src.color} />
                     </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[item.priority])} />
-                      <span className="text-[10px] text-text-muted capitalize">{item.priority} priority</span>
-                      <span className="text-text-muted text-[10px]">·</span>
-                      <span className="text-[10px] text-text-muted">{timeAgo(item.createdAt)}</span>
-                      <span className="text-text-muted text-[10px]">·</span>
-                      <span className="text-[10px] text-text-muted">{item.agentName}</span>
-                      <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize', SENTIMENT_COLOR[item.sentiment])}>
-                        {item.sentiment}
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {!item.read && <div className="w-1.5 h-1.5 rounded-full bg-accent-indigo flex-shrink-0" />}
+                        <p className={cn('text-sm leading-snug', !item.read ? 'font-semibold text-text-primary' : 'font-medium text-text-secondary')}>
+                          {item.title}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[item.priority])} />
+                        <span className="text-[10px] text-text-muted capitalize">{item.priority} priority</span>
+                        <span className="text-text-muted text-[10px]">·</span>
+                        <span className="text-[10px] text-text-muted">{timeAgo(item.createdAt)}</span>
+                        <span className="text-text-muted text-[10px]">·</span>
+                        <span className="text-[10px] text-text-muted">{item.agentName}</span>
+                        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize', SENTIMENT_COLOR[item.sentiment])}>
+                          {item.sentiment}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex-shrink-0 flex items-center gap-2 mt-1">
                     <button
                       onClick={(e) => handleDismiss(e, item._id)}
-                      disabled={readOnlyPreview || busy === item._id}
-                      className="p-1 rounded-lg hover:bg-accent-red/10 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      disabled={busy === item._id}
+                      className="p-1 rounded-lg hover:bg-accent-red/10 transition-colors flex-shrink-0"
                       title="Dismiss insight"
                     >
                       {busy === item._id ? <RefreshCw size={14} className="animate-spin text-text-muted" /> : <Trash2 size={14} className="text-text-muted hover:text-accent-red transition-colors" />}
                     </button>
-                    <span className="text-text-muted">
+                    <button
+                      onClick={() => handleExpand(item._id)}
+                      className="text-text-muted transition-colors hover:text-text-primary"
+                      title={isOpen ? 'Collapse insight' : 'Expand insight'}
+                    >
                       {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </span>
+                    </button>
                   </div>
-                </button>
+                </div>
                 {isOpen && (
                   <div className="px-4 pb-4 animate-slide-up">
                     <div className="pt-3 border-t border-border">

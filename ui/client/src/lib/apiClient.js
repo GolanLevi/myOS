@@ -52,6 +52,7 @@ const REAL_PATCH_ROUTE_MAP = new Map([
 const REAL_DELETE_ROUTE_MAP = new Map([
   ['/api/approvals', '/dashboard/approvals'],
   ['/api/notifications', '/dashboard/notifications'],
+  ['/api/summaries', '/dashboard/summaries'],
 ]);
 
 const READ_ONLY_WRITE_PREFIXES = [
@@ -150,9 +151,12 @@ const resolveRequestTarget = (method, url) => {
     }
   }
 
-  if (IS_REAL_PREVIEW && REAL_APPROVALS_ENABLED && normalizedMethod === 'delete') {
+  if (IS_REAL_PREVIEW && normalizedMethod === 'delete') {
     for (const [prefix, targetPrefix] of REAL_DELETE_ROUTE_MAP.entries()) {
       if (path.startsWith(prefix)) {
+        if (prefix === '/api/approvals' && !REAL_APPROVALS_ENABLED) {
+          continue;
+        }
         return {
           client: realClient,
           url: path.replace(prefix, targetPrefix),

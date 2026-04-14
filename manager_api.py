@@ -1034,6 +1034,24 @@ def _dashboard_should_surface_action(doc: dict[str, Any], *, include_resolved: b
     return True
 
 
+def _dashboard_should_surface_summary(doc: dict[str, Any]) -> bool:
+    if not _dashboard_should_surface_action(doc):
+        return False
+
+    action = str(doc.get("action") or "action")
+    status = str(doc.get("status") or "")
+    params = doc.get("params") or {}
+    approval_action = str(params.get("approval_type") or action)
+    created_at = _coerce_datetime(doc.get("created_at"))
+    urgency = _urgency_meta(
+        action=approval_action,
+        status=status,
+        params=params,
+        created_at=created_at,
+    )
+    return str(urgency.get("priority") or "").strip().lower() != "low"
+
+
 def _build_notification_cards(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     visible_actions = [
@@ -1342,7 +1360,12 @@ def _build_agent_stats(user_id: str) -> dict[str, int]:
 def _build_summaries(user_id: str, source: Optional[str] = None, unread: Optional[bool] = None) -> list[dict[str, Any]]:
     actions = _load_workflow_actions(user_id)
     if actions:
-        visible_actions = [doc for doc in actions if str(doc.get("status") or "") != "processing"]
+        visible_actions = [
+            doc
+            for doc in actions
+            if str(doc.get("status") or "") != "processing"
+            and _dashboard_should_surface_summary(doc)
+        ]
         summaries: list[dict[str, Any]] = []
         for doc in visible_actions:
             action = str(doc.get("action") or "action")
@@ -1956,6 +1979,23 @@ def dashboard_dismiss_notification(action_id: str, user_id: Optional[str] = None
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Notification not found")
+    return {"success": True}
+
+
+@app.delete("/dashboard/summaries/{action_id}")
+def dashboard_dismiss_summary(action_id: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
+    _require_action_doc(action_id, user_id=user_id)
+    updated = workflow_state_store.update_action(
+        action_id,
+        status="dismissed",
+        merge_params={
+            "dismissed": True,
+            "resolution_source": "dashboard_inbox",
+        },
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Summary not found")
     return {"success": True}
 
 

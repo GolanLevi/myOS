@@ -98,6 +98,23 @@
 - Refresh token failure is a normal production path and must trigger a reconnect flow instead of silently failing.
 - For myOS this supports moving Gmail and Calendar auth from local filesystem tokens to database-backed per-user connector sessions.
 
+### Topic: Inbox noise suppression and destructive action clarity in dense dashboards
+
+#### Source: https://carbondesignsystem.com/patterns/common-actions/
+- Destructive actions should be explicit and predictable, and `remove` should be treated differently from permanent `delete` when the product is only dismissing an item from a queue.
+- Error feedback for list actions should stay short and contextual instead of forcing the user into a separate flow.
+- For myOS this supports treating inbox trash as a queue dismissal action and wiring it directly to the same source of truth as the live list.
+
+#### Source: https://rocketvalidator.com/accessibility-validation/axe/4.11/nested-interactive
+- Interactive controls must not be nested inside other interactive controls because click, focus, and screen-reader behavior become unreliable.
+- If a card is clickable and also has its own action buttons, the layout should separate the primary click target from secondary controls rather than literally nesting buttons.
+- For myOS this supports restructuring inbox rows so the expand trigger and trash action are siblings, not nested controls.
+
+#### Source: https://arxiv.org/abs/2603.05893
+- Calm-notification research continues to reinforce that non-urgent items should stay peripheral rather than competing with urgent actions in the main attention surface.
+- Urgency should change visibility and placement, not only color treatment.
+- For myOS this supports filtering ignored and low-priority email summaries out of the main inbox surface instead of merely labeling them as less important.
+
 #### Source: https://clerk.com/docs/organizations/overview
 - Multi-tenant products need an explicit organization context in each active session, including membership and role data.
 - A user can legitimately belong to multiple organizations, so the active tenant must be first-class state rather than inferred from email alone.
