@@ -395,7 +395,7 @@ def _urgency_meta(
     }
 
 
-def _load_workflow_actions(user_id: str = "admin") -> list[dict[str, Any]]:
+def _load_workflow_actions(user_id: str) -> list[dict[str, Any]]:
     actions: list[dict[str, Any]] = []
     try:
         if workflow_state_store.actions is not None:
@@ -1211,7 +1211,7 @@ def _build_approval_cards(actions: list[dict[str, Any]]) -> list[dict[str, Any]]
     return cards[:25]
 
 
-def _build_activity_rows(user_id: str = "admin", limit: int = 50, page: int = 1) -> dict[str, Any]:
+def _build_activity_rows(user_id: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
     actions = _load_workflow_actions(user_id)
     start_of_day = _start_of_local_day()
     start_of_week = _start_of_local_week()
@@ -1282,7 +1282,7 @@ def _build_activity_rows(user_id: str = "admin", limit: int = 50, page: int = 1)
     }
 
 
-def _build_agent_rows(user_id: str = "admin") -> list[dict[str, Any]]:
+def _build_agent_rows(user_id: str) -> list[dict[str, Any]]:
     actions = _load_workflow_actions(user_id)
     writes = _load_checkpoint_writes(limit=200)
     total_actions = len(actions) + len(writes)
@@ -1327,7 +1327,7 @@ def _build_agent_rows(user_id: str = "admin") -> list[dict[str, Any]]:
     ]
 
 
-def _build_agent_stats(user_id: str = "admin") -> dict[str, int]:
+def _build_agent_stats(user_id: str) -> dict[str, int]:
     agents = _build_agent_rows(user_id)
     counts = Counter(agent.get("status", "idle") for agent in agents)
     return {
@@ -1338,7 +1338,7 @@ def _build_agent_stats(user_id: str = "admin") -> dict[str, int]:
     }
 
 
-def _build_summaries(user_id: str = "admin", source: Optional[str] = None, unread: Optional[bool] = None) -> list[dict[str, Any]]:
+def _build_summaries(user_id: str, source: Optional[str] = None, unread: Optional[bool] = None) -> list[dict[str, Any]]:
     actions = _load_workflow_actions(user_id)
     if actions:
         visible_actions = [doc for doc in actions if str(doc.get("status") or "") != "processing"]
@@ -1466,7 +1466,7 @@ def _count_collection_for_user(collection, user_id: str, since: datetime.datetim
         return 0
 
 
-def _load_time_saved_minutes_by_thread(user_id: str = "admin") -> dict[str, float]:
+def _load_time_saved_minutes_by_thread(user_id: str) -> dict[str, float]:
     try:
         docs = list(_get_dashboard_db()["time_saved_log"].find(_dashboard_match(user_id)))
     except Exception as exc:
@@ -1482,7 +1482,7 @@ def _load_time_saved_minutes_by_thread(user_id: str = "admin") -> dict[str, floa
     return minutes_by_thread
 
 
-def _sum_time_saved_minutes(user_id: str = "admin", since: datetime.datetime | None = None) -> float:
+def _sum_time_saved_minutes(user_id: str, since: datetime.datetime | None = None) -> float:
     try:
         return _sum_collection_value(
             _get_dashboard_db()["time_saved_log"],
@@ -1495,7 +1495,7 @@ def _sum_time_saved_minutes(user_id: str = "admin", since: datetime.datetime | N
         return 0.0
 
 
-def _build_finance_stats(user_id: str = "admin") -> dict[str, Any]:
+def _build_finance_stats(user_id: str) -> dict[str, Any]:
     try:
         db = _get_dashboard_db()
         cost_log = db["cost_log"]
@@ -1560,7 +1560,7 @@ def _build_finance_stats(user_id: str = "admin") -> dict[str, Any]:
         }
 
 # --- מודלים ---
-def _count_action_history(user_id: str = "admin") -> int:
+def _count_action_history(user_id: str) -> int:
     try:
         if workflow_state_store.history is not None:
             return int(workflow_state_store.history.count_documents({"user_id": user_id}))
@@ -1569,7 +1569,7 @@ def _count_action_history(user_id: str = "admin") -> int:
     return len([doc for doc in getattr(workflow_state_store, "_memory_history", []) if doc.get("user_id") == user_id])
 
 
-def _build_history_rows(user_id: str = "admin", limit: int = 50, page: int = 1) -> dict[str, Any]:
+def _build_history_rows(user_id: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
     rows = workflow_state_store.list_history(user_id=user_id, limit=limit, page=page)
     items = [
         {
@@ -1698,14 +1698,14 @@ def _log_post_execution_time_saved(
         )
 
 
-def _require_action_doc(action_id: str, user_id: str = "admin") -> dict[str, Any]:
+def _require_action_doc(action_id: str, user_id: str) -> dict[str, Any]:
     doc = workflow_state_store.get_action(action_id)
     if not doc or str(doc.get("user_id") or "admin") != user_id:
         raise HTTPException(status_code=404, detail="Action not found")
     return doc
 
 
-def _resolve_dashboard_hitl_action(action_id: str, *, callback_text: str, user_id: str = "admin") -> dict[str, Any]:
+def _resolve_dashboard_hitl_action(action_id: str, *, callback_text: str, user_id: str) -> dict[str, Any]:
     _require_action_doc(action_id, user_id=user_id)
     response = ask_brain(
         RequestModel(
@@ -1742,7 +1742,7 @@ def _resolve_dashboard_hitl_action(action_id: str, *, callback_text: str, user_i
     }
 
 
-def _resolve_dashboard_feedback(action_id: str, *, feedback_text: str, user_id: str = "admin") -> dict[str, Any]:
+def _resolve_dashboard_feedback(action_id: str, *, feedback_text: str, user_id: str) -> dict[str, Any]:
     _require_action_doc(action_id, user_id=user_id)
     response = ask_brain(
         RequestModel(
@@ -1775,7 +1775,7 @@ def _resolve_dashboard_feedback(action_id: str, *, feedback_text: str, user_id: 
 class RequestModel(BaseModel):
     text: str
     source: str = "telegram"
-    user_id: str = "admin"
+    user_id: Optional[str] = None
     email_id: Optional[str] = None 
     images: Optional[List[str]] = None
     reply_to_message_id: Optional[int] = None 
@@ -1788,12 +1788,30 @@ class ExecutionRequest(BaseModel):
 
 class DashboardFeedbackRequest(BaseModel):
     text: str
-    user_id: str = "admin"
+    user_id: Optional[str] = None
 
 
 class DashboardCallbackRequest(BaseModel):
     callback_text: str
-    user_id: str = "admin"
+    user_id: Optional[str] = None
+
+
+def _require_dashboard_user_id(user_id: Optional[str]) -> str:
+    normalized = str(user_id or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    return normalized
+
+
+def _resolve_request_user_id(payload: RequestModel) -> str:
+    normalized = str(payload.user_id or "").strip()
+    if normalized:
+        return normalized
+
+    if str(payload.source or "").strip().lower() == "dashboard":
+        raise HTTPException(status_code=400, detail="user_id is required for dashboard requests")
+
+    return "admin"
 
 
 @app.get("/")
@@ -1809,14 +1827,16 @@ def memorize_info(payload: RequestModel):
 
 # --- פונקציות עזר לבדיקת אישור ---
 @app.get("/dashboard/notifications")
-def dashboard_notifications(user_id: str = "admin"):
+def dashboard_notifications(user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     actions = _load_workflow_actions(user_id)
     cards = _build_notification_cards(actions)
     return cards
 
 
 @app.get("/dashboard/approvals")
-def dashboard_approvals(status: str = "pending", user_id: str = "admin"):
+def dashboard_approvals(status: str = "pending", user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     cards = _build_approval_cards(_load_workflow_actions(user_id))
     if status:
         cards = [card for card in cards if card.get("status") == status]
@@ -1824,7 +1844,8 @@ def dashboard_approvals(status: str = "pending", user_id: str = "admin"):
 
 
 @app.get("/dashboard/actions/{action_id}/decision-data")
-def dashboard_action_decision_data(action_id: str, user_id: str = "admin"):
+def dashboard_action_decision_data(action_id: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     doc = _require_action_doc(action_id, user_id=user_id)
     cards = _build_approval_cards([doc])
     if not cards:
@@ -1839,12 +1860,14 @@ def dashboard_action_decision_data(action_id: str, user_id: str = "admin"):
 
 
 @app.patch("/dashboard/approvals/{action_id}/approve")
-def dashboard_approve_action(action_id: str, user_id: str = "admin"):
+def dashboard_approve_action(action_id: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _resolve_dashboard_hitl_action(action_id, callback_text="אשר", user_id=user_id)
 
 
 @app.patch("/dashboard/approvals/{action_id}/action/{action_name}")
-def dashboard_approval_action(action_id: str, action_name: str, user_id: str = "admin"):
+def dashboard_approval_action(action_id: str, action_name: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     callback_map = {
         "approve": "אשר",
         "send": "אשר ושלח",
@@ -1863,21 +1886,25 @@ def dashboard_approval_callback(action_id: str, payload: DashboardCallbackReques
     callback_text = str(payload.callback_text or "").strip()
     if not callback_text:
         raise HTTPException(status_code=400, detail="callback_text is required")
-    return _resolve_dashboard_hitl_action(action_id, callback_text=callback_text, user_id=payload.user_id)
+    user_id = _require_dashboard_user_id(payload.user_id)
+    return _resolve_dashboard_hitl_action(action_id, callback_text=callback_text, user_id=user_id)
 
 
 @app.patch("/dashboard/approvals/{action_id}/feedback")
 def dashboard_approval_feedback(action_id: str, payload: DashboardFeedbackRequest):
-    return _resolve_dashboard_feedback(action_id, feedback_text=payload.text, user_id=payload.user_id)
+    user_id = _require_dashboard_user_id(payload.user_id)
+    return _resolve_dashboard_feedback(action_id, feedback_text=payload.text, user_id=user_id)
 
 
 @app.patch("/dashboard/approvals/{action_id}/reject")
-def dashboard_reject_action(action_id: str, user_id: str = "admin"):
+def dashboard_reject_action(action_id: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _resolve_dashboard_hitl_action(action_id, callback_text="בטל", user_id=user_id)
 
 
 @app.delete("/dashboard/approvals/{action_id}")
-def dashboard_dismiss_action(action_id: str, user_id: str = "admin"):
+def dashboard_dismiss_action(action_id: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     _require_action_doc(action_id, user_id=user_id)
     updated = workflow_state_store.update_action(
         action_id,
@@ -1899,7 +1926,8 @@ def dashboard_dismiss_action(action_id: str, user_id: str = "admin"):
 
 
 @app.delete("/dashboard/notifications/{action_id}")
-def dashboard_dismiss_notification(action_id: str, user_id: str = "admin"):
+def dashboard_dismiss_notification(action_id: str, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     _require_action_doc(action_id, user_id=user_id)
     updated = workflow_state_store.update_action(
         action_id,
@@ -1915,32 +1943,38 @@ def dashboard_dismiss_notification(action_id: str, user_id: str = "admin"):
 
 
 @app.get("/dashboard/activity")
-def dashboard_activity(limit: int = 50, page: int = 1, user_id: str = "admin"):
+def dashboard_activity(limit: int = 50, page: int = 1, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _build_activity_rows(user_id=user_id, limit=limit, page=page)
 
 
 @app.get("/dashboard/history")
-def dashboard_history(limit: int = 50, page: int = 1, user_id: str = "admin"):
+def dashboard_history(limit: int = 50, page: int = 1, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _build_history_rows(user_id=user_id, limit=limit, page=page)
 
 
 @app.get("/dashboard/agents")
-def dashboard_agents(user_id: str = "admin"):
+def dashboard_agents(user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _build_agent_rows(user_id=user_id)
 
 
 @app.get("/dashboard/agents/stats")
-def dashboard_agents_stats(user_id: str = "admin"):
+def dashboard_agents_stats(user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _build_agent_stats(user_id=user_id)
 
 
 @app.get("/dashboard/finances/stats")
-def dashboard_finances_stats(user_id: str = "admin"):
+def dashboard_finances_stats(user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _build_finance_stats(user_id=user_id)
 
 
 @app.get("/dashboard/summaries")
-def dashboard_summaries(source: Optional[str] = None, unread: Optional[bool] = None, user_id: str = "admin"):
+def dashboard_summaries(source: Optional[str] = None, unread: Optional[bool] = None, user_id: Optional[str] = None):
+    user_id = _require_dashboard_user_id(user_id)
     return _build_summaries(user_id=user_id, source=source, unread=unread)
 
 
@@ -3005,7 +3039,7 @@ def _build_response(
 def ask_brain(payload: RequestModel):
     # Normalize input: Button callbacks use underscores instead of spaces
     raw_text = payload.text.strip()
-    user_id = payload.user_id 
+    user_id = _resolve_request_user_id(payload)
     
     # 🔑 Decode thread_id from button callback_data (format: "ACTION_TEXT::THREAD_ID")
     embedded_thread_id = None
@@ -3405,7 +3439,7 @@ def ask_brain(payload: RequestModel):
 @app.post("/analyze_email")
 def analyze_incoming_event(payload: RequestModel):
     server_logger.info(f"📧 Analyzing email from source: {payload.source}")
-    user_id = payload.user_id
+    user_id = _resolve_request_user_id(payload)
     
     initial_action_params = _build_incoming_email_action_params(
         payload=payload,

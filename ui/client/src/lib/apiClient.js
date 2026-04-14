@@ -33,7 +33,7 @@ export const DASHBOARD_MODE_HINT = {
 
 export const AUTH_STORAGE_KEY = 'myos_token';
 
-const REAL_API_BASE_URL = (import.meta.env.VITE_REAL_API_BASE_URL || '/real-api').trim();
+const REAL_API_BASE_URL = (import.meta.env.VITE_REAL_API_BASE_URL || '/api/live').trim();
 
 const REAL_GET_ROUTE_MAP = new Map([
   ['/api/notifications', '/dashboard/notifications'],
@@ -88,7 +88,26 @@ demoClient.interceptors.request.use((config) => {
   return config;
 });
 
+realClient.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 demoClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+    return Promise.reject(error);
+  }
+);
+
+realClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {

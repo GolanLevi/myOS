@@ -67,6 +67,13 @@ function deriveConversationTitle(existingTitle, latestUserMessage, latestAssista
   return words || 'Conversation';
 }
 
+function resolveWorkflowUserId(user) {
+  if (!user?._id) return '';
+  return String(user.role || '').toLowerCase() === 'admin'
+    ? 'admin'
+    : user._id.toString();
+}
+
 // GET /api/chat - list conversations (title + lastActivity, no messages)
 router.get('/', async (req, res) => {
   try {
@@ -124,7 +131,7 @@ router.post('/:id/messages', async (req, res) => {
       const pythonApiUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
       const response = await axios.post(
         `${pythonApiUrl}/ask`,
-        { text: content, source: 'dashboard', user_id: 'admin' },
+        { text: content, source: 'dashboard', user_id: resolveWorkflowUserId(req.user) },
         { timeout: 15000 }
       );
       aiReply = response.data?.answer || response.data?.message || null;

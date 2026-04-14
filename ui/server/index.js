@@ -12,6 +12,7 @@ import integrationRoutes  from './routes/integrations.js';
 import taskRoutes         from './routes/tasks.js';
 import activityRoutes     from './routes/activity.js';
 import chatRoutes         from './routes/chat.js';
+import liveDashboardRoutes from './routes/liveDashboard.js';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/api/integrations',  integrationRoutes);
 app.use('/api/tasks',         taskRoutes);
 app.use('/api/activity',      activityRoutes);
 app.use('/api/chat',          chatRoutes);
+app.use('/api/live',          liveDashboardRoutes);
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
